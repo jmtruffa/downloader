@@ -33,10 +33,10 @@ def downloadITCRM():
 
 
     # Convert the "date" column to numeric (Unix timestamps)
-    data_df["date"] = pd.to_datetime(data_df["date"]).astype(int) // 10**9
+    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/economicData.db")
+    db = DatabaseConnection("/Users/juan/data/economicData.sqlite3")
     db.connect()
 
     # Check if the table exists and create if needed

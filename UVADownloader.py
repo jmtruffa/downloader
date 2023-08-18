@@ -4,8 +4,8 @@ import pandas as pd
 import requests
 from dataBaseConn import DatabaseConnection
 
-def downloadA3500():
-    url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/com3500.xls"
+def downloadUVA():
+    url = "http://www.bcra.gov.ar/Pdfs/PublicacionesEstadisticas/diar_uva.xls"
     # Create a temporary directory to store the downloaded file
     temp_dir = tempfile.mkdtemp()
 
@@ -18,10 +18,10 @@ def downloadA3500():
         file.write(response.content)
 
     # Read the specified range "A:B" from the first sheet
-    data_df = pd.read_excel(file_path, sheet_name=0, usecols="C:D", skiprows=3)
+    data_df = pd.read_excel(file_path, sheet_name=0, usecols="A:B", skiprows=27, header= None)
 
     # Set column names
-    data_df.columns = ["date", "A3500"]
+    data_df.columns = ["date", "UVA"]
  
     # Convert the "date" column to numeric (Unix timestamps)
     data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
@@ -31,11 +31,11 @@ def downloadA3500():
     db.connect()
 
     # Check if the table exists
-    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='A3500'"):
-        db.create_table("A3500", "date INTEGER, A3500 REAL")
+    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='UVA'"):
+        db.create_table("UVA", "date INTEGER, UVA REAL")
 
     # Query the last date in the existing table
-    last_date_query = "SELECT MAX(date) FROM A3500"
+    last_date_query = "SELECT MAX(date) FROM UVA"
     last_date_result = db.execute_select_query(last_date_query)
     last_date = last_date_result[0][0] if last_date_result[0][0] else 0
 
@@ -43,8 +43,8 @@ def downloadA3500():
 
     if not new_rows.empty:
         # Insert new rows into the table using executemany
-        new_rows_data = [{"date": int(row["date"]), "A3500": row["A3500"]} for _, row in new_rows.iterrows()]
-        db.insert_data_many("A3500", new_rows_data)
+        new_rows_data = [{"date": int(row["date"]), "UVA": row["UVA"]} for _, row in new_rows.iterrows()]
+        db.insert_data_many("UVA", new_rows_data)
     
     db.disconnect()
 
@@ -53,6 +53,7 @@ def downloadA3500():
 
     return True
 
+# Example usage
 if __name__ == "__main__":
-    downloadA3500()
+    downloadUVA()
     print("Data updated in the database.")

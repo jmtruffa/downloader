@@ -24,10 +24,10 @@ def downloadCER():
     data_df.columns = ["date", "CER"]
  
     # Convert the "date" column to numeric (Unix timestamps)
-    data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).astype(int) // 10**9
+    data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
     
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/economicData.db")
+    db = DatabaseConnection("/Users/juan/data/economicData.sqlite3")
     db.connect()
 
     # Check if the table exists
