@@ -19,9 +19,14 @@ def downloadCER():
 
     # Read the specified range "A:B" from the first sheet
     data_df = pd.read_excel(file_path, sheet_name=0, usecols="A:B", skiprows=26)
-
+    
     # Set column names
     data_df.columns = ["date", "CER"]
+
+    data_df["date"] = pd.to_datetime(data_df["date"], format="%d/%m/%Y") 
+
+    # Save as CSV
+    data_df.to_csv("~/Google Drive/Mi Unidad/analisis financieros/functions/data/CER.csv", date_format='%Y-%m-%d', index=False)
  
     # Convert the "date" column to numeric (Unix timestamps)
     data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
@@ -50,6 +55,7 @@ def downloadCER():
 
     # Delete the temporary file
     os.remove(file_path)
+
 
     return True
 
