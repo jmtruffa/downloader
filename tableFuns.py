@@ -2,6 +2,7 @@ from dataBaseConn import DatabaseConnection
 import pandas as pd
 
 def getTable(table):
+    """Devuelve la tabla especificada en el argumento 'table' como un DataFrame. La obtiene de la base de datos 'test.sqlite3'"""
     
     table = table.upper()
     db = DatabaseConnection("/Users/juan/data/test.sqlite3")
