@@ -35,9 +35,26 @@ class DatabaseConnection:
         query = f"INSERT INTO {table_name} ({columns}) VALUES ({values})"
         self.execute_query(query)
 
-    def insert_data_many(self, table_name, data_list):
-        columns = data_list[0].keys()
-        values = [tuple(data.values()) for data in data_list]
-        query = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(columns))})"
-        self.conn.executemany(query, values)
+    def insert_data_many(self, table_name, data_list, overwrite=False):
+        if not self.conn:
+            raise ConnectionError("Database connection is not established.")
+        
+        # Determine whether to overwrite the table
+        if overwrite:
+            self.execute_query(f"DELETE FROM {table_name}")
+            self.conn.commit()
+        
+        # Construct and execute the INSERT query
+        column_names = ", ".join(data_list[0].keys())
+        placeholders = ", ".join(["?" for _ in data_list[0]])
+
+        query = f"INSERT INTO {table_name} ({column_names}) VALUES ({placeholders})"
+        data_to_insert = [tuple(row.values()) for row in data_list]
+
+        self.conn.executemany(query, data_to_insert)
         self.conn.commit()
+        # columns = data_list[0].keys()
+        # values = [tuple(data.values()) for data in data_list]
+        # query = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(columns))})"
+        # self.conn.executemany(query, values)
+        # self.conn.commit()

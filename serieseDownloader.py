@@ -94,7 +94,7 @@ def downloadBaseMonetaria():
     
     data_to_insert = data_df.to_dict(orient="records")
 
-    db.insert_data_many("bmBCRA", data_to_insert)
+    db.insert_data_many("bmBCRA", data_to_insert, overwrite=True)
     
     db.disconnect()
 
