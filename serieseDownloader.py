@@ -5,7 +5,7 @@ import requests
 from dataBaseConn import DatabaseConnection
 from janitor import cleanNames
 
-def downloadBaseMonetaria():
+def download():
     url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/series.xlsm"
 
     # Create a temporary directory to store the downloaded file
@@ -19,10 +19,16 @@ def downloadBaseMonetaria():
     with open(file_path, "wb") as file:
         file.write(response.content)
 
+    return file_path
+
+def bm(file_path = None):
+
+    if file_path == None:
+
+        file_path = download()
+
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="BASE MONETARIA", usecols="A:AF", skiprows=8)
-
-    #data_df["date"] = data_df["Fecha"]
     
     # Drop columns B, P, and X
     columns_to_drop = [1, 15, 23]
@@ -71,6 +77,60 @@ def downloadBaseMonetaria():
 
     # Check if the table exists
     if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='bmBCRA'"):
+        
+        # Define column names and types        
+        columnDefinitionsSQL = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in column_definitions])
+        
+
+        db.create_table("bmBCRA", columnDefinitionsSQL)
+
+    
+    data_to_insert = data_df.to_dict(orient="records")
+
+    db.insert_data_many("bmBCRA", data_to_insert, overwrite=True)
+    
+    db.disconnect()
+
+    # Delete the temporary file if it was not passed as an argument
+    if file_path == None:
+        os.remove(file_path)
+
+    return True
+
+def reservas(file_path = None):
+
+    if file_path == None:
+
+        file_path = download()
+
+    data_df = pd.read_excel(file_path, sheet_name="RESERVAS", usecols="A:Q", skiprows=9, header=None)
+
+    columns_to_drop = [1, 5, 12, 14]
+    data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
+
+    column_definitions = ("date",
+      "stockTotal",
+      "stockOroColPlazoOtros",
+      "stockDivisasPasePasivoUSDExterior",
+      "vdReservasIntl",
+      "vdFeCompraDivisas",
+      "vdFeOrgIntl",
+      "vdFeOtrasOpSP",
+      "vdFeEfecMinimo",
+      "vdFeOtros",
+      "AsigDEGs",
+      "TC",
+      "tipoSerie")
+    
+    data_df.columns = column_definitions
+
+    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
+
+    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db.connect()
+
+    # Check if the table exists
+    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='reservas'"):
         # Define column names and types
         #column_definitions = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in data_df.columns])
         #column_definitions = cleanNames(data_df).dtypes.to_dict()
@@ -79,31 +139,209 @@ def downloadBaseMonetaria():
         columnDefinitionsSQL = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in column_definitions])
         
 
-        db.create_table("bmBCRA", columnDefinitionsSQL)
+        db.create_table("reservas", columnDefinitionsSQL)
 
-    # # Query the last date in the existing table
-    # last_date_query = "SELECT MAX(date) FROM bmBCRA"
-    # last_date_result = db.execute_select_query(last_date_query)
-    # last_date = last_date_result[0][0] if last_date_result[0][0] else 0
-
-    # new_rows = data_df[data_df["date"] > last_date]
-
-    #Insert new rows into the table using executemany
-    # Dump data into table
-    #new_rows_data = [{"date": int(row["date"]), "col_1": row["col_1"], "col_2": row["col_2"], ...} for _, row in data_df.iterrows()]
-    
-    data_to_insert = data_df.to_dict(orient="records")
-
-    db.insert_data_many("bmBCRA", data_to_insert, overwrite=True)
+    db.insert_data_many("reservas", data_df, overwrite=True)
     
     db.disconnect()
 
-    # Delete the temporary file
-    os.remove(file_path)
+    # Delete the temporary file if it was not passed as an argument
+    if file_path == None:
+        os.remove(file_path)
 
     return True
 
+def depositos(file_path = None):
+
+    if file_path == None:
+
+        file_path = download()
+
+    data_df = pd.read_excel(file_path, sheet_name="DEPOSITOS", usecols="A:AD", skiprows=9, header=None)
+
+    columns_to_drop = [21, 24, 27]
+    data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
+
+    column_definitions = (
+      "date",
+      "ptCtaCte",
+      "ptCA",
+      "ptPFNoAjust",
+      "ptPFAjustCERUVA",
+      "ptOtros",
+      "ptCedrosCER",
+      "ptTotalDepositos",
+      "ptBodenContabilizado",
+      "ptTotal",
+      "pSPPesosCtaCte",
+      "pSPPesosCA",
+      "pSPPesosPFNoAjust",
+      "pSPPesosPFAjustCERUVA",
+      "pSPPesosOtros",
+      "pSPPesosCedrosCER",
+      "pSPPesosTotalDepositos",
+      "pSPPesosBodenContabilizado",
+      "pSPPesosTotal",
+      "depositosDolaresExprPesosTotal",
+      "depositosDolaresExprPesosSPrivado",
+      "depositosTotales",
+      "depositosTotalesSectorPrivado",
+      "depositosDolaresExprDolaresTotal",
+      "depositosDolaresExprDolaresSPrivado",
+      "M2",
+      "tipoSerie"
+    )
+
+    data_df.columns = column_definitions
+
+    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
+
+    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db.connect()
+
+    # Check if the table exists
+    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='depositos'"):
+        # Define column names and types
+        columnDefinitionsSQL = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in column_definitions])
+        
+        db.create_table("depositos", columnDefinitionsSQL)
+
+    db.insert_data_many("depositos", data_df, overwrite=True)
+    
+    db.disconnect()
+
+    # Delete the temporary file if it was not passed as an argument
+    if file_path == None:
+        os.remove(file_path)
+
+    return True
+
+def prestamos(file_path = None):
+
+    if file_path == None:
+
+        file_path = download()
+
+    data_df = pd.read_excel(file_path, sheet_name="PRESTAMOS", usecols="A:V", skiprows=9, header=None)
+
+    columns_to_drop = [17, 19]
+    data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
+
+    column_definitions = (
+      "date",
+      "prestamosSPPesosAdelantos",
+      "prestamosSPPesosDocumentos",
+      "prestamosSPPesosHipotecarios",
+      "prestamosSPPesosPrendarios",
+      "prestamosSPPesosPersonales",
+      "prestamosSPPesosTarjetas",
+      "prestamosSPPesosOtros",
+      "prestamosSPPesosTotal",
+      "prestamosSPDolaresAdelantos",
+      "prestamosSPDolaresDocumentos",
+      "prestamosSPDolaresHipotecarios",
+      "prestamosSPDolaresPrendarios",
+      "prestamosSPDolaresPersonales",
+      "prestamosSPDolaresTarjetas",
+      "prestamosSPDolaresOtros",
+      "prestamosSPDolaresTotal",
+      "prestamosSPMillonesPesosDolares",
+      "prestamosSPPesosMasDolares",
+      "tipoSerie"
+    )
+
+    data_df.columns = column_definitions
+
+    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
+
+    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db.connect()
+
+    # Check if the table exists
+    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='prestamos'"):
+        # Define column names and types
+        columnDefinitionsSQL = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in column_definitions])
+        
+        db.create_table("prestamos", columnDefinitionsSQL)
+
+    db.insert_data_many("prestamos", data_df, overwrite=True)
+
+    db.disconnect()
+
+    # Delete the temporary file if it was not passed as an argument
+    if file_path == None:
+        os.remove(file_path)
+
+    return True
+
+def tasas(file_path = None):
+
+    if file_path == None:
+
+        file_path = download() 
+
+    data_df = pd.read_excel(file_path, sheet_name="TASAS DE MERCADO", usecols="A:V", skiprows=9, header=None)
+
+    column_definitions = (
+      "date",
+      "PF3044DiasPesosTotalGeneralTNA",
+      "PF3044DiasPesosHastaCienmilTNA",
+      "PF3044DiasPesosHastaCienmilTEA",
+      "PF3044DiasPesosMasUnmillonTNA",
+      "PF3044DiasDolaresTotalGeneralTNA",
+      "PF3044DiasDolaresHastaCienmilTNA",
+      "PF3044DiasDolaresMasUnmillonTNA",
+      "badlarPesosTotalTNA",
+      "badlarPesosTotalBancosPrivadosTNA",
+      "badlarPesosTotalBancosPrivadosTEA",
+      "TM20PesosTotalTNA",
+      "TM20PesosBancoprivadosTNA",
+      "TM20PesosBancoprivadosTEA",
+      "prestamosPersonalesPesosTotalTNA",
+      "adelantosPesosTotalTNA",
+      "callPesosEntreprivadosTasaTNA",
+      "callPesosEntreprivadosMontoMillones",
+      "callPesosTotalTasaTNA",
+      "callPesosTotalMontoMillones",
+      "pasesEntreTerceros1DiaTNA",
+      "pasesEntreTercerosMontoMillones"
+    )
+
+    data_df.columns = column_definitions
+
+    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
+
+    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db.connect()
+
+    # Check if the table exists
+    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='tasas'"):
+        # Define column names and types
+        columnDefinitionsSQL = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in column_definitions])
+        
+        db.create_table("tasas", columnDefinitionsSQL)
+
+    db.insert_data_many("tasas", data_df, overwrite=True)
+
+    db.disconnect()
+
+    # Delete the temporary file if it was not passed as an argument
+    if file_path == None:
+        os.remove(file_path)
+
+    return True
+
+def instrumentos(file_path = None):
+
+    
+
+
+
 # Example usage
 if __name__ == "__main__":
-    downloadBaseMonetaria()
+    file_path = download()
+    bm()
+    #reservas(file_path)
     print("Data updated in the database.")
+    os.remove(file_path)
+    print("Temporary file deleted.")

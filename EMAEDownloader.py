@@ -8,7 +8,7 @@ def downloadEMAE():
     url = "https://www.indec.gob.ar/ftp/cuadros/economia/sh_emae_mensual_base2004.xls"
     # Create a temporary directory to store the downloaded file
     temp_dir = tempfile.mkdtemp()
-
+    
     # File path for the downloaded XLS file
     file_path = os.path.join(temp_dir, "data.xls")
 
@@ -18,7 +18,7 @@ def downloadEMAE():
         file.write(response.content)
 
     # Read the specified range "A:B" from the first sheet
-    data_df = pd.read_excel(file_path, sheet_name="EMAE", usecols="C:H", skiprows=4, header=None)
+    data_df = pd.read_excel(file_path, sheet_name=0, usecols="C:H", skiprows=4, header=None)
 
     
     

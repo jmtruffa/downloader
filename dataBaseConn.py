@@ -1,4 +1,5 @@
 import sqlite3
+import pandas as pd
 
 class DatabaseConnection:
     def __init__(self, db_name):
@@ -38,6 +39,10 @@ class DatabaseConnection:
     def insert_data_many(self, table_name, data_list, overwrite=False):
         if not self.conn:
             raise ConnectionError("Database connection is not established.")
+        
+        # Convert data list to list of dictionaries if it's a DataFrame
+        if isinstance(data_list, pd.DataFrame):
+            data_list = data_list.to_dict(orient="records")
         
         # Determine whether to overwrite the table
         if overwrite:
