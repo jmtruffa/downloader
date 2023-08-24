@@ -333,7 +333,84 @@ def tasas(file_path = None):
 
 def instrumentos(file_path = None):
 
+    if file_path == None:
+
+            file_path = download() 
+
+    data_df = pd.read_excel(file_path, sheet_name="INSTRUMENTOS DEL BCRA", usecols="A:AS", skiprows=9, header=None)
     
+    column_definitions = (
+      "date",
+      "saldosPasesPasivosPesosTotal",
+      "saldosPasesPasivosPesosFCI",
+      "saldosPasesActivosPesos",
+      "saldosLeliqNotaliq",
+      "saldosLebacNobacPesosLegarLeminTotal",
+      "saldosLebacNobacPesosLegarLeminEntFinancieras",
+      "saldosLebacDolaresLediv",
+      "saldosNocom",
+      "tasaPolMonTNA",
+      "tasaPolMonTEA",
+      "tasaPasePesosPasivo1Dia",
+      "tasaPasePesosPasivo7Dias",
+      "tasaPasePesosActivo1Dia",
+      "tasaPasePesosActivo7Dia",
+      "tasaLebacPesosLeliq1M",
+      "tasaLebacPesosLeliq2M",
+      "tasaLebacPesosLeliq3M",
+      "tasaLebacPesosLeliq4M",
+      "tasaLebacPesosLeliq5M",
+      "tasaLebacPesosLeliq6M",
+      "tasaLebacPesosLeliq7M",
+      "tasaLebacPesosLeliq8M",
+      "tasaLebacPesosLeliq9M",
+      "tasaLebacPesosLeliq10M",
+      "tasaLebacPesosLeliq11M",
+      "tasaLebacPesosLeliq12M",
+      "tasaLebacPesosLeliq18M",
+      "tasaLebacPesosLeliq24M",
+      "tasaPesosCER6M",
+      "tasaPesosCER12M",
+      "tasaPesosCER18M",
+      "tasaPesosCER24M",
+      "tasaLebacDolar1MLiquidablePesos",
+      "tasaLebacDolar6MLiquidablePesos",
+      "tasaLebacDolar12MLiquidablePesos",
+      "tasaLebacDolar1MLiquidableDolar",
+      "tasaLebacDolar3MLiquidableDolar",
+      "tasaLebacDolar6MLiquidableDolar",
+      "tasaLebacDolar12MLiquidableDolar",
+      "tasaNobacPesosVariableBadlarBcoPriv9M",
+      "tasaNobacPesosVariableBadlarBcoPriv1A",
+      "tasaNobacPesosVariableBadlarTotal2A",
+      "tasaNobacPesosVariableBadlarBcoPriv2A",
+      "tasaNotaliqPesosVariableTasaPolMon190d"
+    )
+
+    data_df.columns = column_definitions
+
+    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
+
+    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db.connect()
+    
+    # Check if the table exists
+    if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='instrumentos'"):
+        # Define column names and types
+        columnDefinitionsSQL = ", ".join([f"{col} INTEGER" if col == "date" else f"{col} REAL" for col in column_definitions])
+        
+        db.create_table("instrumentos", columnDefinitionsSQL)
+    
+    db.insert_data_many("instrumentos", data_df, overwrite=True)
+
+    db.disconnect()
+
+    # Delete the temporary file if it was not passed as an argument
+    if file_path == None:
+        os.remove(file_path)
+    
+    return True
+
 
 
 
