@@ -13,9 +13,14 @@ def downloadITCRM():
     file_path = os.path.join(temp_dir, "data.xlsx")
 
     # Download the XLS file from the URL
-    response = requests.get(url)
-    with open(file_path, "wb") as file:
-        file.write(response.content)
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Check if the request was successful
+        with open(file_path, "wb") as file:
+            file.write(response.content)
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while downloading the file: {e}")
+        return False
 
     # Read the Excel file until an empty row is encountered
     data_rows = []
@@ -76,7 +81,10 @@ def downloadITCRM():
 # Example usage
 if __name__ == "__main__":
     downloadITCRM()
-    print("Data updated in the database.")
+    if downloadITCRM():
+        print("ITCRM downloaded successfully")
+    else:
+        print("An error occurred while downloading ITCRM")
 
 
     

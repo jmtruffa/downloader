@@ -3,7 +3,7 @@ import tempfile
 import pandas as pd
 import requests
 from dataBaseConn import DatabaseConnection
-from janitor import cleanNames
+
 
 def download():
     url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/series.xlsm"
@@ -14,10 +14,16 @@ def download():
     # File path for the downloaded XLSM file
     file_path = os.path.join(temp_dir, "data.xlsm")
 
-    # Download the XLSM file from the URL
-    response = requests.get(url)
-    with open(file_path, "wb") as file:
-        file.write(response.content)
+    # Download the XLS file from the URL
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Check if the request was successful
+        with open(file_path, "wb") as file:
+            file.write(response.content)
+            print("File downloaded successfully")
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while downloading the file: {e}")
+        return False
 
     return file_path
 
@@ -30,7 +36,6 @@ def bm(file_path = None):
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="BASE MONETARIA", usecols="A:AF", skiprows=8)
     
-    # Drop columns B, P, and X
     columns_to_drop = [1, 15, 23]
     data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
 
@@ -411,14 +416,26 @@ def instrumentos(file_path = None):
     
     return True
 
-
+def main():
+    file_path = download()
+    for func in [bm, reservas, depositos, prestamos, tasas, instrumentos]:
+        func(file_path)
+        if func(file_path):
+            print(f"{func.__name__} downloaded successfully")
+        else:
+            print(f"An error occurred while downloading {func.__name__}")
+    os.remove(file_path)
+    print("Temporary file deleted.")
 
 
 # Example usage
 if __name__ == "__main__":
     file_path = download()
-    bm()
-    #reservas(file_path)
-    print("Data updated in the database.")
+    for func in [bm, reservas, depositos, prestamos, tasas, instrumentos]:
+        func(file_path)
+        if func(file_path):
+            print(f"{func.__name__} downloaded successfully")
+        else:
+            print(f"An error occurred while downloading {func.__name__}")
     os.remove(file_path)
     print("Temporary file deleted.")
