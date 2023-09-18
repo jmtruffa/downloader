@@ -12,7 +12,7 @@ def downloadCER():
     # File path for the downloaded XLS file
     file_path = os.path.join(temp_dir, "data.xls")
 
-    # Download the XLS file from the URL
+    # Download the XLS file from the URL 
     try:
         response = requests.get(url)
         response.raise_for_status()  # Check if the request was successful
@@ -30,8 +30,9 @@ def downloadCER():
 
     data_df["date"] = pd.to_datetime(data_df["date"], format="%d/%m/%Y") 
 
+    # used before when yields needed a csv file.
     # Save as CSV
-    data_df.to_csv("~/Google Drive/Mi Unidad/analisis financieros/functions/data/CER.csv", date_format='%Y-%m-%d', index=False)
+    # data_df.to_csv("~/Google Drive/Mi Unidad/analisis financieros/functions/data/CER.csv", date_format='%Y-%m-%d', index=False)
  
     # Convert the "date" column to numeric (Unix timestamps)
     data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9

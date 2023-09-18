@@ -107,7 +107,11 @@ def serieDiaria(file_path = None):
     return True
     
 if __name__ == "__main__":
+    print("Descargando serie diaria...")
     file_path = download()
+    print("Serie diaria descargada. Actualizando base de datos...")
     serieDiaria(file_path)
+    print("Base de datos actualizada.")
+    print("Borrando archivo temporal...")
     os.remove(file_path)
 
