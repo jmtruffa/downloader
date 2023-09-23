@@ -3,7 +3,6 @@ from A3500Downloader import downloadA3500
 from ITCRMDownloader import downloadITCRM
 from UVADownloader import downloadUVA
 from EMAEDownloader import downloadEMAE
-from tableFuns import getTable
 import serieseDownloader as bcra
 import serieDiariaDownloader as serieDiaria
 

@@ -3,6 +3,10 @@ import tempfile
 import pandas as pd
 import requests
 from dataBaseConn import DatabaseConnection
+from datetime import datetime
+
+currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 def downloadCER():
     url = "http://www.bcra.gov.ar/Pdfs/PublicacionesEstadisticas/diar_cer.xls"
@@ -21,6 +25,9 @@ def downloadCER():
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while downloading the file: {e}")
         return False
+    
+    print("------------------------------------")
+    print(f"CER downloaded successfully at {currentTime}")
 
     # Read the specified range "A:B" from the first sheet
     data_df = pd.read_excel(file_path, sheet_name=0, usecols="A:B", skiprows=26)
@@ -38,7 +45,7 @@ def downloadCER():
     data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
     
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/economicData.sqlite3")
+    db = DatabaseConnection("/home/juant/data/economicData.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -67,8 +74,6 @@ def downloadCER():
 # Example usage
 if __name__ == "__main__":
 
-    if downloadCER():
-        print("Data updated in the database.")
-    else:
-        print("Data download failed.")
-    
+    if downloadCER() == False:
+        print("An error occurred while downloading CER")
+

@@ -3,6 +3,9 @@ import tempfile
 import pandas as pd
 import requests
 from dataBaseConn import DatabaseConnection
+from datetime import datetime
+
+currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def downloadITCRM():
     url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/ITCRMSerie.xlsx"
@@ -11,6 +14,7 @@ def downloadITCRM():
 
     # File path for the downloaded XLS file
     file_path = os.path.join(temp_dir, "data.xlsx")
+    
 
     # Download the XLS file from the URL
     try:
@@ -19,8 +23,11 @@ def downloadITCRM():
         with open(file_path, "wb") as file:
             file.write(response.content)
     except requests.exceptions.RequestException as e:
-        print(f"An error occurred while downloading the file: {e}")
+        print(f"An error occurred while downloading the file: {e} a las {currentTime}")
         return False
+    
+    print("------------------------------------")
+    print("ITCRM downloaded successfully at " + currentTime)
 
     # Read the Excel file until an empty row is encountered
     data_rows = []
@@ -38,10 +45,16 @@ def downloadITCRM():
 
 
     # Convert the "date" column to numeric (Unix timestamps)
-    data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
+    # Convert the "date" column to datetime format, ignoring text
+    data_df["date"] = pd.to_datetime(data_df["date"], errors='coerce')
+    # Filter out rows with NaT (text)
+    data_df = data_df.dropna(subset=["date"])
+    # Convert the "date" column to Unix timestamp
+    data_df["date"] = data_df["date"].view('int64') // 10**9
+    #data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/economicData.sqlite3")
+    db = DatabaseConnection("/home/juant/data/economicData.sqlite3")
     db.connect()
 
     # Check if the table exists and create if needed
@@ -73,18 +86,20 @@ def downloadITCRM():
     # Disconnect from the database
     db.disconnect()
 
+    print("ITCRM updated successfully at " + currentTime)
+    
+
     # Delete the temporary file
+    print("Removing temporary files...")
     os.remove(file_path)
 
     return True
 
 # Example usage
 if __name__ == "__main__":
-    downloadITCRM()
-    if downloadITCRM():
-        print("ITCRM downloaded successfully")
-    else:
-        print("An error occurred while downloading ITCRM")
+    #currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if downloadITCRM()== False:
+        print(f"An error occurred while downloading ITCRM at {currentTime}")
 
 
     

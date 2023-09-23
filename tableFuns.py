@@ -7,7 +7,7 @@ def getTable(table, freq = None):
     # Obtenemos el nombre de la base de datos a la que pertenece la tabla
     #table = table.upper()
 
-    db = DatabaseConnection("/Users/juan/data/test.sqlite3")
+    db = DatabaseConnection("/home/juant/data/test.sqlite3")
     db.connect()
     query = f"SELECT db FROM tables WHERE name = '{table}'"
     db_result = db.execute_select_query(query)
@@ -16,7 +16,7 @@ def getTable(table, freq = None):
     # Si la tabla existe en la base de datos
     if db_result:
         # Construimos el path de la base de datos
-        db_name = f"/Users/juan/data/{db_result[0][0]}.sqlite3"
+        db_name = f"/home/juant/data/{db_result[0][0]}.sqlite3"
     
         # Nos conectamos a la base de datos
         db = DatabaseConnection(db_name)

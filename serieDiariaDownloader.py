@@ -82,7 +82,7 @@ def serieDiaria(file_path = None):
     data_df["date"] = pd.to_datetime(data_df["date"], format="%Y%m%d").view('int64') // 10**9
     #data_df["date"] = pd.to_datetime(data_df["date"]).to_timestamp
 
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
     # Check if the table exists

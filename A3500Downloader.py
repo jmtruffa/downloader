@@ -3,6 +3,9 @@ import tempfile
 import pandas as pd
 import requests
 from dataBaseConn import DatabaseConnection
+from datetime import datetime
+
+currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def downloadA3500():
     url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/com3500.xls"
@@ -18,10 +21,13 @@ def downloadA3500():
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while downloading the file: {e}")
+    except requests.exceptions.RequestException as e:    
+        print(f"An error occurred while downloading the file: {e} a las {currentTime}")
         return False
-
+    
+    print("------------------------------------")
+    print("A3500 downloaded successfully at " + currentTime)
+    
     # Read the specified range "A:B" from the first sheet
     data_df = pd.read_excel(file_path, sheet_name=0, usecols="C:D", skiprows=3)
 
@@ -32,7 +38,7 @@ def downloadA3500():
     data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
     
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/economicData.sqlite3")
+    db = DatabaseConnection("/home/juant/data/economicData.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -50,6 +56,8 @@ def downloadA3500():
         # Insert new rows into the table using executemany
         new_rows_data = [{"date": int(row["date"]), "A3500": row["A3500"]} for _, row in new_rows.iterrows()]
         db.insert_data_many("A3500", new_rows_data)
+    else:
+        print("No se encontraron nuevos datos para insertar")
     
     db.disconnect()
 
@@ -59,9 +67,6 @@ def downloadA3500():
     return True
 
 if __name__ == "__main__":
-    downloadA3500()
-    if downloadA3500():
-        print("A3500 downloaded successfully")
-    else:
+    if downloadA3500() == False:
         print("An error occurred while downloading A3500")
         

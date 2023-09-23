@@ -27,7 +27,7 @@ def downloadUVA():
     data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
     
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/economicData.sqlite3")
+    db = DatabaseConnection("/home/juant/data/economicData.sqlite3")
     db.connect()
 
     # Check if the table exists

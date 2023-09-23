@@ -3,6 +3,7 @@ import tempfile
 import pandas as pd
 import requests
 from dataBaseConn import DatabaseConnection
+from datetime import datetime
 
 
 def download():
@@ -20,7 +21,8 @@ def download():
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)
-            print("File downloaded successfully")
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"File downloaded successfully at {current_time}")
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while downloading the file: {e}")
         return False
@@ -77,7 +79,7 @@ def bm(file_path = None):
     data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
     # Initialize the database connection abstraction
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -131,7 +133,7 @@ def reservas(file_path = None):
 
     data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -201,7 +203,7 @@ def depositos(file_path = None):
 
     data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -259,7 +261,7 @@ def prestamos(file_path = None):
 
     data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -316,7 +318,7 @@ def tasas(file_path = None):
 
     data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
     # Check if the table exists
@@ -396,7 +398,7 @@ def instrumentos(file_path = None):
 
     data_df["date"] = pd.to_datetime(data_df["date"]).view('int64') // 10**9
 
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
     
     # Check if the table exists
@@ -434,7 +436,8 @@ if __name__ == "__main__":
     for func in [bm, reservas, depositos, prestamos, tasas, instrumentos]:
         func(file_path)
         if func(file_path):
-            print(f"{func.__name__} downloaded successfully")
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{func.__name__} parsed successfully at {current_time}")
         else:
             print(f"An error occurred while downloading {func.__name__}")
     os.remove(file_path)

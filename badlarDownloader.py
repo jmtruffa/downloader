@@ -49,7 +49,7 @@ def downloadBadlar(fechaDesde = "01/01/2003"):
 
 def calculateFrom():
     """Chequea la última fecha disponible de Badlar en la base de datos. Tabla "tasas" """
-    db = DatabaseConnection("/Users/juan/data/dataBCRA.sqlite3")
+    db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
     lastDateQuery = "SELECT MAX(date) FROM tasas"
     lastDateResult = db.execute_select_query(lastDateQuery)
