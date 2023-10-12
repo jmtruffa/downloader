@@ -22,6 +22,7 @@ def download():
         with open(file_path, "wb") as file:
             file.write(response.content)
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print("------------------------------------")
             print(f"File downloaded successfully at {current_time}")
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while downloading the file: {e}")
