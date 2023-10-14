@@ -69,7 +69,7 @@ def parseSheets(aSheet, aSkipRows, aUseCols, aTableName, aColumnsToDrop, file_pa
 
     data_to_insert = data_df.to_dict(orient="records")
 
-    db.insert_data_many(aTableName, data_to_insert, overwrite=True)
+    db.insert_data_many(aTableName, data_to_insert, overwrite=False)
     
     db.disconnect()
 
@@ -84,7 +84,7 @@ def parseSheets(aSheet, aSkipRows, aUseCols, aTableName, aColumnsToDrop, file_pa
     
 if __name__ == "__main__":
     print("Descargando serie de depositos...")
-    file_path = download()
+    file_path = download(year = "2023")
 
     if file_path == False:
         exit()
