@@ -26,7 +26,7 @@ def download(year = str(datetime.date.today().year)):
             file.write(response.content)
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print("------------------------------------")
-            print(f"File downloaded successfully at {current_time}")            
+            print(f"File for the year: {year}, downloaded successfully at {current_time}")            
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while downloading the file: {e}")
         return False
@@ -59,7 +59,7 @@ def parseSheets(aSheet, aSkipRows, aUseCols, aTableName, aColumnsToDrop, file_pa
     db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
-    # Check if the table exists
+    # Check if the table exists. If not, create it.
     if not db.execute_select_query(f"SELECT name FROM sqlite_master WHERE type='table' AND name= '{aTableName}'"):
         
         # Define column names and types        
@@ -67,9 +67,26 @@ def parseSheets(aSheet, aSkipRows, aUseCols, aTableName, aColumnsToDrop, file_pa
 
         db.create_table(aTableName, columnDefinitionsSQL)
 
-    data_to_insert = data_df.to_dict(orient="records")
+        data_to_insert = data_df.to_dict(orient="records")
+    
+    else:
+        # Check if the table has data. If it does, get the last date in the table
+        last_date = db.execute_select_query(f"SELECT MAX(date) FROM {aTableName}")[0][0]
 
-    db.insert_data_many(aTableName, data_to_insert, overwrite=False)
+        # Filter the dataframe to only include rows with dates greater than the last date in the table
+        data_df = data_df[data_df["date"] > last_date]
+
+        data_to_insert = data_df.to_dict(orient="records")
+
+    # Check if there are rows to be inserted
+    if len(data_to_insert) == 0:
+        print("No rows to be inserted. Exiting...")
+    
+    else:
+        print(f"Inserting {len(data_to_insert)} rows into {aTableName}")
+
+        # Insert the data into the table
+        db.insert_data_many(aTableName, data_to_insert, overwrite=False)
     
     db.disconnect()
 
@@ -84,7 +101,7 @@ def parseSheets(aSheet, aSkipRows, aUseCols, aTableName, aColumnsToDrop, file_pa
     
 if __name__ == "__main__":
     print("Descargando serie de depositos...")
-    file_path = download(year = "2023")
+    file_path = download()
 
     if file_path == False:
         exit()

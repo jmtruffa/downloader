@@ -24,6 +24,9 @@ def download(year = str(datetime.date.today().year)):
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print("------------------------------------")
+            print(f"File for the year: {year}, downloaded successfully at {current_time}")            
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while downloading the file: {e}")
         return False
@@ -31,8 +34,8 @@ def download(year = str(datetime.date.today().year)):
     return file_path
 
 
-def serieDiaria(file_path = None):
-
+def parseSerieDiaria(file_path = None):
+    """ Parse the specified sheet from the downloaded XLSM file and insert the data into the database"""
     if file_path == None:
         file_path = download()
 
@@ -85,7 +88,7 @@ def serieDiaria(file_path = None):
     db = DatabaseConnection("/home/juant/data/dataBCRA.sqlite3")
     db.connect()
 
-    # Check if the table exists
+    # Check if the table exists. If not, create it.
     if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='serieDiaria'"):
         
         # Define column names and types        
@@ -94,6 +97,7 @@ def serieDiaria(file_path = None):
 
         db.create_table("serieDiaria", columnDefinitionsSQL)
 
+    
     data_to_insert = data_df.to_dict(orient="records")
 
     db.insert_data_many("serieDiaria", data_to_insert, overwrite=True)
@@ -110,8 +114,10 @@ if __name__ == "__main__":
     print("Descargando serie diaria...")
     file_path = download()
     print("Serie diaria descargada. Actualizando base de datos...")
-    serieDiaria(file_path)
+    parseSerieDiaria(file_path)
     print("Base de datos actualizada.")
     print("Borrando archivo temporal...")
     os.remove(file_path)
+
+    
 
