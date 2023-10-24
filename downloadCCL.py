@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from dataBaseConn import DatabaseConnection
 
 # Define the database file path
-db_file = "/Users/juan/data/historicalData.sqlite3"
+db_file = "otro/Users/juan/data/historicalData.sqlite3"
 
 
 # Function to query the API with specific date range
