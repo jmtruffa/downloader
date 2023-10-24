@@ -25,6 +25,10 @@ class DatabaseConnection:
             cursor = self.conn.cursor()
             cursor.execute(query)
             return cursor.fetchall()
+        
+    def execute_select_query_df(self, query):
+        if self.conn:
+            return pd.read_sql_query(query, self.conn)
 
     def create_table(self, table_name, columns):
         query = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns})"

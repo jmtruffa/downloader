@@ -49,30 +49,13 @@ def downloadEMAE():
     if not db.execute_select_query("SELECT name FROM sqlite_master WHERE type='table' AND name='EMAE'"):
         db.create_table("EMAE", "date INTEGER, EMAE REAL, EMAEVarAnual REAL, EMAEDesest REAL, EMAEDesestVarMensual REAL, EMAETendenciaCiclo REAL, EMAETendenciaCiclo_var_mensual REAL")
 
-    # Query the last date in the existing table
-    last_date_query = "SELECT MAX(date) FROM EMAE"
-    last_date_result = db.execute_select_query(last_date_query)
-    last_date = last_date_result[0][0] if last_date_result[0][0] else 0
 
-    new_rows = data_df[data_df["date"] > last_date]
-
-    if not new_rows.empty:
     # Prepare data for insertion
-        new_rows_data = [
-            {
-                "date": int(row["date"]),
-                "EMAE": row["EMAE"],
-                "EMAEVarAnual": row["EMAEVarAnual"],
-                "EMAEDesest": row["EMAEDesest"],
-                "EMAEDesestVarMensual": row["EMAEDesestVarMensual"],
-                "EMAETendenciaCiclo": row["EMAETendenciaCiclo"],
-                "EMAETendenciaCiclo_var_mensual": row["EMAETendenciaCiclo_var_mensual"]
-            }
-            for _, row in new_rows.iterrows()
-        ]
-    
-        # Insert new rows into the table using executemany
-        db.insert_data_many("EMAE", new_rows_data)
+    data_to_insert = data_df.to_dict(orient="records")
+
+    db.insert_data_many("EMAE", data_to_insert, overwrite=True)
+
+
     
     db.disconnect()
 
