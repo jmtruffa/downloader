@@ -49,7 +49,7 @@ def downloadCCL():
     newDate += timedelta(days=1)
 
     # Query the API for data
-    df = query_api(newDate + timedelta(days=1), end_date)
+    df = query_api(newDate, end_date)
 
     if not df.empty:
                 
