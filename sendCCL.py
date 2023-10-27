@@ -41,7 +41,7 @@ def getCCL():
     return file_path
 
 
-def sendEmail(sender_email, recipient_emails, subject, body, file_path):
+def sendEmail(sender_email, recipient_emails_file, subject, body, file_path):
 
     # Read Gmail credentials from the 'gmail.txt' file
     with open('/home/juant/data/credentials.txt', 'r') as file:
@@ -65,6 +65,9 @@ def sendEmail(sender_email, recipient_emails, subject, body, file_path):
 
     filename = file_path
     attachment = open(filename, 'rb')
+
+    recipient_df = pd.read_csv(recipient_emails_file)
+    recipient_emails = recipient_df['email'].tolist()
 
     # Loop through the recipient email addresses
     for recipient_email in recipient_emails:
@@ -110,11 +113,12 @@ if __name__ == '__main__':
         exit()
 
     sender_email = 'jmtruffa@gmail.com'
-    recipient_emails = ['jmtruffa@gmail.com'] #['recipient1@example.com', 'recipient2@example.com', 'recipient3@example.com']
+    recipient_emails_file = 'emails.csv'
+    #recipient_emails = ['jmtruffa@gmail.com'] #['recipient1@example.com', 'recipient2@example.com', 'recipient3@example.com']
     subject = 'CCL - Envío automático'
     body = 'Ver adjunto.'
 
-    sendEmail(sender_email, recipient_emails, subject, body, file_path)
+    sendEmail(sender_email, recipient_emails_file, subject, body, file_path)
     
     os.remove(file_path)
 
