@@ -64,8 +64,8 @@ def sendEmail(sender_email, recipient_emails_file, subject, body, file_path):
     #smtp.login('your-email@example.com', 'your-password')  # Replace with your email and password
 
     filename = file_path
-    attachment = open(filename, 'rb')
-
+    attachment = open(filename, 'rb').read()
+    
     recipient_df = pd.read_csv(recipient_emails_file)
     recipient_emails = recipient_df['email'].tolist()
 
@@ -80,7 +80,7 @@ def sendEmail(sender_email, recipient_emails_file, subject, body, file_path):
 
         part = MIMEBase('application', 'octet-stream')
         # Attach a file (e.g., 'attachment.txt') to the email
-        part.set_payload((attachment).read())
+        part.set_payload(attachment)
         encoders.encode_base64(part)
         part.add_header('Content-Disposition', "attachment; filename= %s" % filename)
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         exit()
 
     sender_email = 'jmtruffa@gmail.com'
-    recipient_emails_file = 'emails.csv'
+    recipient_emails_file = '/home/juant/data/apps/emails.csv'
     #recipient_emails = ['jmtruffa@gmail.com'] #['recipient1@example.com', 'recipient2@example.com', 'recipient3@example.com']
     subject = 'CCL - Envío automático'
     body = 'Ver adjunto.'
