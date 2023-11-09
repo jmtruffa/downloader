@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from dataBaseConn2 import DatabaseConnection
+import sqlalchemy
 
 
 
@@ -30,7 +31,7 @@ def downloadCCL():
 
     # Create a DatabaseConnection instance
     #db = DatabaseConnection("/home/juant/data/historicalData.sqlite3")
-    db = DatabaseConnection(db_type='postgresql', db_name='historicalData')
+    db = DatabaseConnection(db_type='postgresql', db_name='data')
     db.connect()
 
     # Query the last date in the table
@@ -82,11 +83,9 @@ def downloadCCL():
         df = df.set_index('date')
 
         # Append the DataFrame to the database table
-        print(df.columns)
-        print(df.columns)
-        print(df.dtypes)
-        df.to_sql(name = 'cclTemp', con = db.conn, if_exists = 'append', index = True, index_label = 'date')
-        df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date')
+        #df.to_sql(name = 'cclTemp', con = db.conn, if_exists = 'append', index = True, index_label = 'date')
+        dtypeMap = {'date': sqlalchemy.types.Date}
+        df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date', dtype=dtypeMap, schema = 'public')
         #db.insert_data_many('ccl', df.reset_index().copy(), overwrite=False)
 
         # print number of rows inserted

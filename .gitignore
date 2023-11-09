@@ -1,3 +1,6 @@
 /CERDownloaderOld.py
 /__pycache__
 /xlsDownloader.py
+emails.csv
+emailsPostgres.csv
+tempEnvVars.sh
