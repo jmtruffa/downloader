@@ -3,6 +3,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+
 
 import pandas as pd
 
@@ -16,9 +18,11 @@ currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 def download():
     """Descarga los montos operados en MAE y devuelve un dataframe con los datos"""
 
-    
 
-    driver = webdriver.Chrome()
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--disable-gpu')
+    driver = webdriver.Chrome(options = chrome_options)
 
     urlMAE = "https://www.mae.com.ar/mercados/forex"
 
