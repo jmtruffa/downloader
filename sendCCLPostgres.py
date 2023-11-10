@@ -120,7 +120,7 @@ if __name__ == '__main__':
         exit()
 
     sender_email = 'jmtruffa@gmail.com'
-    recipient_emails_file =  './emailsPostgres.csv'#'/home/juant/data/apps/emailsPostgres.csv'
+    recipient_emails_file =  '/home/juant/data/apps/emailsPostgres.csv'
     #recipient_emails = ['jmtruffa@gmail.com'] #['recipient1@example.com', 'recipient2@example.com', 'recipient3@example.com']
     subject = 'CCL - Envío automático'
     body = 'Ver adjunto.'
