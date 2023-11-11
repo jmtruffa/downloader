@@ -129,9 +129,10 @@ if __name__ == "__main__":
     max_attempts = 5
     attempts = 0
     forexTable = None
-
+    print('-' * 20)
     while attempts < max_attempts and (forexTable is None or forexTable.empty):
-        print(f"Intento {attempts + 1} a las {currentTime}")
+
+        print(f"Intento {attempts + 1} de scrapear datos de Forex MAE a las {currentTime}")
         forexTable = download()
         attempts += 1
 

@@ -55,6 +55,11 @@ def downloadCCL():
     df = query_api(newDate, end_date)
 
     if not df.empty:
+
+        # Check if there is a row with the value 'CCL' in the 'spot' column
+        if not df['spot'].str.contains('CCL').any():
+            print("No hay datos para insertar ya que no hay un 'spot' con 'CCL'")
+            return
                 
         # Filter rows with 'spot' starting with 'CCL'
         df = df[df['spot'].str.startswith('CCL')]
