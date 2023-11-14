@@ -78,6 +78,7 @@ def bm(file_path = None):
     
     data_df.to_sql('bmBCRA', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
 
+
     if file_path == None:
         os.remove(file_path)
 
@@ -350,5 +351,6 @@ if __name__ == "__main__":
         else:
             print(f"An error occurred while downloading {func.__name__}")
     os.remove(file_path)
+    db.conn.commit()
     db.disconnect()
     print("Temporary file deleted.")

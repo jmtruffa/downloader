@@ -84,6 +84,7 @@ def parseSheets(aSheet, aSkipRows, aUseCols, aTableName, aColumnsToDrop, file_pa
         # use Date type for the 'date' column in the database to get rid of the time part
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = data_to_insert.to_sql(name = aTableName, con = db.engine, if_exists = 'append', index = False, dtype=dtypeMap, schema = 'public')
+        db.conn.commit()
         print(f"Number of records inserted as reported by the postgres server: {result}") 
 
 

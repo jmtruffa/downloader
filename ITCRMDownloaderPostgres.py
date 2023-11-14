@@ -70,6 +70,7 @@ def downloadITCRM():
         # use Date type for the 'date' column in the database to get rid of the time part
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = data_df.to_sql(name = 'ITCRM', con = db.engine, if_exists = 'replace', index = False, dtype=dtypeMap, schema = 'public')
+        db.conn.commit()
         print(f"Number of records inserted as reported by the postgres server: {result}") 
     
     # Disconnect from the database

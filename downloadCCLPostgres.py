@@ -90,11 +90,11 @@ def downloadCCL():
         # Append the DataFrame to the database table
         #df.to_sql(name = 'cclTemp', con = db.conn, if_exists = 'append', index = True, index_label = 'date')
         dtypeMap = {'date': sqlalchemy.types.Date}
-        df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date', dtype=dtypeMap, schema = 'public')
-        #db.insert_data_many('ccl', df.reset_index().copy(), overwrite=False)
+        rowsInserted = df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date', dtype=dtypeMap, schema = 'public')
+        db.conn.commit() # agregado porque decía que grababa pero no lo hacía
 
         # print number of rows inserted
-        print(f"Inserted {len(df)} rows")
+        print(f"Inserted {rowsInserted} rows")
 
     else:
         print("No data to insert")
