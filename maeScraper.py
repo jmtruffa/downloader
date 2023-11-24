@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+import os
 
 
 import pandas as pd
@@ -84,7 +85,7 @@ def saveToDatabase(df):
 
     # Save the df to the postgres database updating the existing data
     # connect to the database
-    db = DatabaseConnection(db_type="postgresql", db_name= "data")
+    db = DatabaseConnection(db_type="postgresql", db_name= os.environ.get('POSTGRES_DB'))
     db.connect()
 
     # Check if the table exists

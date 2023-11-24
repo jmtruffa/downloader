@@ -40,7 +40,7 @@ def downloadA3500():
     data_df['date'] = pd.to_datetime(data_df['date'], format=date_format)
 
     # connect to the database
-    db = DatabaseConnection(db_type="postgresql", db_name= "data")
+    db = DatabaseConnection(db_type="postgresql", db_name= os.environ.get('POSTGRES_DB'))
     db.connect()
 
     # Check if the table exists

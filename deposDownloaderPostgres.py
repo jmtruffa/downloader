@@ -162,7 +162,7 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(params)
 
-    db = DatabaseConnection(db_type='postgresql', db_name='data')
+    db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
     for index, row in df.iterrows():
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

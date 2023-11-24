@@ -4,6 +4,7 @@ from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
 from datetime import datetime
 import warnings
+import os
 
 def make_request(url):
     
@@ -54,7 +55,7 @@ def saveToDatabase(df):
 
     # Save the df to the postgres database updating the existing data
     # connect to the database
-    db = DatabaseConnection(db_type="postgresql", db_name= "data")
+    db = DatabaseConnection(db_type="postgresql", db_name= os.environ.get('POSTGRES_DB'))
     db.connect()
 
     # Check if the table exists

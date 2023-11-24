@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
+import os
 
 
 
@@ -31,7 +32,7 @@ def downloadCCL():
 
     # Create a DatabaseConnection instance
     #db = DatabaseConnection("/home/juant/data/historicalData.sqlite3")
-    db = DatabaseConnection(db_type='postgresql', db_name='data')
+    db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
 
     # Query the last date in the table
