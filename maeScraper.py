@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 import os
+from io import StringIO
 
 
 import pandas as pd
@@ -40,7 +41,9 @@ def download():
         table_html = table_element.get_attribute('outerHTML')
 
         # Use pandas to read the HTML table into a DataFrame
-        df = pd.read_html(table_html)[0]
+        html_data = StringIO(table_html)
+        df = pd.read_html(html_data)[0]
+        #df = pd.read_html(table_html)[0]
 
         # add column date with current date as column 0
         df.insert(0, 'date', pd.to_datetime(datetime.now().strftime("%Y-%m-%d")))
