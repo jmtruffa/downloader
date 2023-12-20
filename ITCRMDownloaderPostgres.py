@@ -58,7 +58,7 @@ def downloadITCRM():
                                                                                                 "ITCRMSuiza", "ITCRMZonaEuro", "ITCRMVietname", "ITCRMSudamerica"]].apply(pd.to_numeric, errors='coerce')
     
     
-    db = DatabaseConnection(db_type="postgresql", db_name= "data")
+    db = DatabaseConnection(db_type="postgresql", db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
     
     # Not need to check if table exists, since ITCRM is constantly recalculated backwards
