@@ -46,7 +46,7 @@ def downloadUVA():
     # data_df["date"] = pd.to_datetime(data_df["date"], dayfirst=True).view('int64') // 10**9
     
     # Initialize the database connection abstraction
-    db = DatabaseConnection(db_type="postgresql", db_name= "data")
+    db = DatabaseConnection(db_type="postgresql", db_name= os.environ.get('POSTGRES_DB'))
     db.connect()
 
     # Check if the table exists
