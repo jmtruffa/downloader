@@ -43,7 +43,7 @@ def downloadEMAE():
     #data_df["date"] = pd.to_datetime(data_df["date"], 
     
     # connect to the database
-    db = DatabaseConnection(db_type="postgresql", db_name= "data")
+    db = DatabaseConnection(db_type="postgresql", db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
 
     # Not need to check if table exists, since EMAE is constantly recalculated backwards
