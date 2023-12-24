@@ -8,6 +8,7 @@ from datetime import datetime
 
 
 
+
 def download():
     url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/series.xlsm"
 
@@ -164,6 +165,7 @@ def depositos(file_path = None):
     data_df.columns = column_definitions
 
     data_df.to_sql('depositos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    db.execute_query("CALL agregadosprivados();")
     
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -339,7 +341,7 @@ def main():
 # Example usage
 if __name__ == "__main__":
     file_path = download()
-    db = DatabaseConnection(db_type='postgresql', db_name='data')
+    db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
     # use Date type for the 'date' column in the database to get rid of the time part
     dtypeMap = {'date': sqlalchemy.types.Date}
