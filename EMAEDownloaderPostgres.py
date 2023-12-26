@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
+import datetime
 
 def downloadEMAE():
     url = "https://www.indec.gob.ar/ftp/cuadros/economia/sh_emae_mensual_base2004.xls"
@@ -52,7 +53,9 @@ def downloadEMAE():
     if len(data_df) == 0:
         print("No rows to be inserted. Exiting...")
     else:
-        print(f"Inserting {len(data_df)} rows into CER Table")
+        time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print("-" * 80)
+        print(f"Inserting {len(data_df)} rows into EMAE Table at {time}")
         # use Date type for the 'date' column in the database to get rid of the time part
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = data_df.to_sql(name = 'EMAE', con = db.engine, if_exists = 'replace', index = False, dtype=dtypeMap, schema = 'public')
@@ -70,7 +73,6 @@ def downloadEMAE():
 
 # Example usage
 if __name__ == "__main__":
-    downloadEMAE()
     if downloadEMAE():
         print("Data updated in the database.")
     else:
