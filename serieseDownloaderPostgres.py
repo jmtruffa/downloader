@@ -165,7 +165,7 @@ def depositos(file_path = None):
     data_df.columns = column_definitions
 
     data_df.to_sql('depositos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
-    db.execute_query("CALL agregadosprivados();")
+    db.execute_query("SELECT agregadosprivados();")
     
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
