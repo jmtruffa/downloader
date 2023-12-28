@@ -53,10 +53,11 @@ def make_request(url):
 def saveToDatabase(df):
     """Graba los datos en la base de datos postgres"""
 
-    # Save the df to the postgres database updating the existing data
+
     # connect to the database
     db = DatabaseConnection(db_type="postgresql", db_name= os.environ.get('POSTGRES_DB'))
     db.connect()
+
 
     # Check if the table exists
     table_exists_query = f"""
@@ -87,11 +88,76 @@ def saveToDatabase(df):
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = data_to_insert.to_sql(name = 'caucionesBYMA', con = db.engine, if_exists = 'append', index = False, dtype=dtypeMap, schema = 'public')
         db.conn.commit()
+        print(f"Number of records in caucionesBYMA inserted as reported by the postgres server: {result}.")
+
+        # ahora grabamos la serie capitalizada
+
+        # Construir la serie capitalizada
+
+        # primero traemos la serie de tasas completa
+        query = f'SELECT date, vwap, "daysToMaturity" FROM "caucionesBYMA"'
+        df = pd.read_sql(query, db.conn)
+
+        # convertimos el campo date a datetime
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # capitalizamos la serie
+        serieCapitalizada_df = capitaliza(df)
+            
+        # grabamos la serie capitalizada en la base de datos
+        dtypeMap = {'date': sqlalchemy.types.Date}
+        result = serieCapitalizada_df.to_sql('caucionesCapitalizada', db.conn, if_exists='replace', index=False, dtype=dtypeMap, schema = 'public')
+        db.conn.commit()
         print(f"Number of records inserted as reported by the postgres server: {result}.")
 
+
+    # cerra la conexion a la base de datos
     db.disconnect()
 
     return True
+
+
+def capitaliza(df):
+    first_date = df['date'].min()
+    date_range = pd.date_range(first_date, pd.to_datetime('today')).date
+
+    result_df = pd.DataFrame({'date': date_range})
+
+    markup1 = 0.03
+    markup2 = 0.05
+
+    # left_join result_df with df
+    
+    
+    result_df['date'] = pd.to_datetime(result_df['date'])
+    result_df = pd.merge(result_df, df, on='date', how='left')
+    
+
+    #SELECT date, vwap AS tasa, "daysToMaturity" AS dias
+    #FROM public."caucionesBYMA"
+
+    # Calculate the three "tasa efectiva diaria" columns. The first one is the original one, the second one is with a 3% markup and the third one is with a 5% markup
+    result_df['ted'] = (1 + result_df['vwap'] / 365 * result_df['daysToMaturity'])**(1/result_df['daysToMaturity']) - 1
+    result_df['ted2'] = (1 + (result_df['vwap'] + markup1) / 365 * result_df['daysToMaturity'])**(1/result_df['daysToMaturity']) - 1
+    result_df['ted3'] = (1 + (result_df['vwap'] + markup2) / 365 * result_df['daysToMaturity'])**(1/result_df['daysToMaturity']) - 1
+
+    # Fill the NaNs with the previous value
+    result_df[['ted', 'ted2', 'ted3']] = result_df[['ted', 'ted2', 'ted3']].fillna(method='ffill')
+
+    # Calculate the factors
+    result_df['factor'] = result_df['ted'] + 1
+    result_df['factor2'] = result_df['ted2'] + 1
+    result_df['factor3'] = result_df['ted3'] + 1
+
+    # Calculate the capitalization series
+    result_df['cap'] = result_df['factor'].cumprod()
+    result_df['cap1'] = result_df['factor2'].cumprod()
+    result_df['cap2'] = result_df['factor3'].cumprod()
+
+    # keep date column, and the last 9 columns
+    return result_df.iloc[:, [0] + list(range(-9, 0))]
+
+
 
 if __name__ == "__main__":
     """Main function that requests data from the API and saves it to the database. Prints the time of the execution."""
@@ -123,5 +189,9 @@ if __name__ == "__main__":
         if df is not None:
             final_df = final_df._append(df, ignore_index=True)
 
+
     # Display the final result DataFrame
     saveToDatabase(final_df)
+
+    # Print the current time
+    print(f"Finalizado script CAUCIONES a las : {datetime.now()}")
