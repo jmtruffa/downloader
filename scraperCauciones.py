@@ -142,7 +142,7 @@ def capitaliza(df):
     result_df['ted3'] = (1 + (result_df['vwap'] + markup2) / 365 * result_df['daysToMaturity'])**(1/result_df['daysToMaturity']) - 1
 
     # Fill the NaNs with the previous value
-    result_df[['ted', 'ted2', 'ted3']] = result_df[['ted', 'ted2', 'ted3']].fillna(method='ffill')
+    result_df[['ted', 'ted2', 'ted3']] = result_df[['ted', 'ted2', 'ted3']].ffill()
 
     # Calculate the factors
     result_df['factor'] = result_df['ted'] + 1
