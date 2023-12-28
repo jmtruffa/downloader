@@ -6,7 +6,37 @@ from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
 from datetime import datetime
 
+def varAgregados():
+    
+    ag = pd.read_sql_query('SELECT * FROM "agregadosPrivados"', con=db.conn)
 
+    
+
+    ag['date'] = ag['date'].astype('datetime64[ns]')
+        
+    ag['anioMenos'] = ag['date'] - pd.DateOffset(years=1)
+
+    # cast anioMenos to datetime
+    ag['anioMenos'] = ag['anioMenos'].astype('datetime64[ns]')
+
+    # merge df with itself on date and anioMenos
+
+    ag = ag.merge(ag, left_on='anioMenos', right_on='date', suffixes=('', '_anioMenos'))
+    ag.drop(columns=['anioMenos', 'date_anioMenos', 'anioMenos_anioMenos'], inplace=True)
+    # divide columns 1:4 by columns 5:8
+    for column in ag.columns[1:5]:
+        ag[column] = ag[column] / ag[column + '_anioMenos'] - 1
+    
+    # drop columns 5:8
+    ag.drop(columns=ag.columns[5:9], inplace=True)
+
+    dtypeMap = {'date': sqlalchemy.types.Date}
+
+    ag.to_sql(name='varAgregados', con=db.conn, if_exists='replace', index=False, schema='public', dtype=dtypeMap)
+    # commit
+    db.conn.commit()
+
+    return ag
 
 
 def download():
@@ -166,6 +196,11 @@ def depositos(file_path = None):
 
     data_df.to_sql('depositos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
     db.execute_query("SELECT agregadosprivados();")
+
+    # acá vamos a calcular las variaciones anuales de los agregados privados
+    df_varAg = varAgregados()
+
+    df_varAg.to_sql('varAnualAgregadosPrivados', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
     
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
