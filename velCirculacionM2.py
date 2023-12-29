@@ -23,6 +23,7 @@ def main():
     # Set the frequency of the DataFrame's index
     df['date'] = pd.to_datetime(df['date'])
     df.set_index('date', inplace=True)
+    df.index.freq = 'D'  # Set the frequency to 'D' (day)
 
     #apply x13 to M2Real
     x13 = x13_arima_analysis(df['M2Real'], x12path='/home/juant/dev/bin/x13as')
