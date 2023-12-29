@@ -20,7 +20,9 @@ def main():
     df = pd.merge(M2, IPC, on='date')
     df['M2Real'] = df['M2'] / df['nacionalNivelGeneral']
 
-
+    # Set the frequency of the DataFrame's index
+    df['date'] = pd.to_datetime(df['date'])
+    df.set_index('date', inplace=True)
 
     #apply x13 to M2Real
     x13 = x13_arima_analysis(df['M2Real'], x12path='/home/juant/dev/bin/x13as')
