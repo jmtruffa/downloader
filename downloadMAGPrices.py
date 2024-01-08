@@ -86,10 +86,38 @@ def download(date_pairs):
                 # Append the current DataFrame to the overall result
                 all_data = pd.concat([all_data, df], ignore_index=True)
 
-            
-
             except Exception as e:
                 print(f"An error occurred: {e}")
+
+        # Put decimal place in the third position from the right in columns precioMinimo, precioMaximo, precioPromedio, precioMediana, kgs
+        #all_data['precioMinimo'] = all_data['precioMinimo'].str[:-2] + '.' + all_data['precioMinimo'].str[-2:]
+        #all_data['precioMaximo'] = all_data['precioMaximo'].str[:-2] + '.' + all_data['precioMaximo'].str[-2:]
+        #all_data['precioPromedio'] = all_data['precioPromedio'].str[:-2] + '.' + all_data['precioPromedio'].str[-2:]
+        #all_data['precioMediana'] = all_data['precioMediana'].str[:-2] + '.' + all_data['precioMediana'].str[-2:]
+
+        #all_data['totalCabezas'] = all_data['totalCabezas'].str[:-2] + '.' + all_data['totalCabezas'].str[-2:]
+        #all_data['totalCabezas'] = all_data['totalCabezas'].str.replace("[.]", "")
+        all_data['totalCabezas'] = all_data['totalCabezas'].replace("[\.]", "", regex=True)
+
+        # filter out any non numeric characters in th ecolumn importe and divide by 100
+        all_data["importe"] = all_data["importe"].replace('[\$,.]', '', regex=True)
+
+        #all_data["importe"] = all_data["importe"].str.replace("[^0-9]", "")
+        #all_data['kgs'] = all_data['kgs'].str[:-2] + '.' + all_data['kgs'].str[-2:]
+        all_data['kgs'] = all_data['kgs'].replace("[\.]", "", regex=True)
+        all_data["promKgs"] = all_data["promKgs"].replace("[\.]", "", regex=True)
+        
+        # cast columns to numeric
+        all_data['date'] = pd.to_datetime(all_data['date'], format="%d/%m/%Y").dt.strftime("%Y-%m-%d")
+        all_data["precioMinimo"] = all_data["precioMinimo"] / 1000
+        all_data["precioMaximo"] = all_data["precioMaximo"] / 1000
+        all_data["precioPromedio"] = pd.to_numeric(all_data["precioPromedio"]) / 1000
+        all_data["precioMediana"] = all_data["precioMediana"] / 1000
+        all_data["totalCabezas"] = pd.to_numeric(all_data["totalCabezas"])
+        all_data["importe"] = pd.to_numeric(all_data["importe"]) / 100
+        all_data["kgs"] = pd.to_numeric(all_data["kgs"])
+        all_data["promKgs"] = pd.to_numeric(all_data["promKgs"])
+        
 
         return all_data
 
@@ -97,22 +125,6 @@ def download(date_pairs):
     finally:
         # Close the WebDriver outside the loop
         driver.quit()
-
-# def generate_date_pairs(start_date, end_date):
-#     """Genera pares de fechas para scrapear precios del MAG. Los pares son todos de un día para así obtener la información diaria y no promedio entre fechas consultadas"""
-#     date_format = "%d/%m/%Y"
-#     start_date_obj = datetime.strptime(start_date, date_format)
-#     end_date_obj = datetime.strptime(end_date, date_format)
-
-#     current_date = start_date_obj
-#     date_pairs = []
-
-#     while current_date <= end_date_obj:
-#         date_pairs.append([current_date.strftime(date_format), current_date.strftime(date_format)])
-#         current_date += timedelta(days=1)
-
-#     return date_pairs
-
 
 def generate_date_pairs(start_date, end_date):
     """Genera pares de fechas para scrapear precios del MAG. Los pares son todos de un día para así obtener la información diaria y no promedio entre fechas consultadas"""
@@ -138,7 +150,7 @@ def getStartDate(db):
         print(f"An error occurred: {e}")
         warnings.warn("Exception. Exiting", UserWarning)
     
-    lastDateValue = lastDate.iloc[0,0] if lastDate.iloc[0,0] else 0
+    lastDateValue = lastDate.iloc[0,0] if lastDate.iloc[0,0] else datetime(2018, 1, 1)
     lastDateValue = pd.to_datetime(lastDateValue, format="%Y-%m-%d").date()
 
     # add 1 day to lastDateValue
@@ -150,7 +162,7 @@ def getStartDate(db):
 def saveToDatabase(df, db):
     """Graba los datos en la base de datos postgres"""
 
-    df['date'] = pd.to_datetime(df['date'], format="%d/%m/%Y").dt.strftime("%Y-%m-%d")
+    
 
     # Save the df to the postgres database updating the existing data. If exists, replace it
     dtypeMap = {'date': sqlalchemy.types.Date}
