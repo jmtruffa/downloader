@@ -185,6 +185,11 @@ if __name__ == "__main__":
 
     startDate = getStartDate(db)
 
+    # if startDate is greater than today, exit
+    if startDate > datetime.now().date():
+        print(f"No hay datos para actualizar. Saliendo...")
+        exit()
+
     #date_pairs = generate_date_pairs(startDate.strftime("%d/%m/%Y"), datetime.now().strftime("%d/%m/%Y"))
     date_pairs = generate_date_pairs(startDate, datetime.now().date())
 
