@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 import warnings
+import sys
 
 import pandas as pd
 
@@ -188,7 +189,7 @@ if __name__ == "__main__":
     # if startDate is greater than today, exit
     if startDate > datetime.now().date():
         print(f"No hay datos para actualizar. Saliendo...")
-        exit()
+        sys.exit()
 
     #date_pairs = generate_date_pairs(startDate.strftime("%d/%m/%Y"), datetime.now().strftime("%d/%m/%Y"))
     date_pairs = generate_date_pairs(startDate, datetime.now().date())
