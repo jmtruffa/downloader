@@ -18,9 +18,14 @@ def downloadIPC(aCurrentTime):
     anio = str(anio)[2:]
 
     # construyo url "https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_11_23.xls" con el mes actual
-    url = "https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_" + str(mes) + "_" + anio + ".xls"
+    # str(mes) with leading zero if necessary
+    if mes < 10:
+        mes = "0" + str(mes)
+    else:
+        mes = str(mes)
+    url = "https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_" + mes + "_" + anio + ".xls"
     print(url)
-
+    # https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_01_24.xls
    
     # Create a temporary directory to store the downloaded file
     temp_dir = tempfile.mkdtemp()
@@ -54,14 +59,15 @@ def parseIPC(file_path, aCurrentTime):
     data_df = data_df.T
 
     # Drop columns
-    columns_to_drop = [1, 2, 3, 17, 18, 22, 23] + list(range(26, 34,1)) + [47, 48, 52, 53] + list(range(56, 64, 1)) + [77, 78, 82, 83] + list(range(86,94,1)) + [107, 108, 112, 113] + list(range(116,124,1)) + [137, 138, 142, 143] + list(range(146,154,1)) + [167, 168, 172, 173] + list(range(176,184,1)) + [197, 198, 202, 203] + list(range(206,211,1))
+    columns_to_drop = [1, 2, 3, 17, 18, 22, 23] + list(range(26, 34,1)) + [47, 48, 52, 53] + list(range(56, 64, 1)) + [77, 78, 82, 83] + list(range(86,94,1)) + [107, 108, 112, 113] + list(range(116,124,1)) + [137, 138, 142, 143] + list(range(146,154,1)) + [167, 168, 172, 173] + list(range(176,184,1)) + [197, 198, 202, 203] + list(range(206,213,1))
     data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
     
-    # drop row 0
+    # Drop rows
     data_df = data_df.drop([0])
+    
 
-    # Set column names
-    data_df.columns = ["date", 
+
+    columnNames = ["date", 
                        "nacionalNivelGeneral", "nacionalAlimBebidasNoAlcohol", "nacionalBebidasAlcoholTabaco", "nacionalPrendasVestirCalzado", "nacionalViviendaAgua", "nacionalEquipamiento", "nacionalSalud", "nacionalTransporte", "nacionalComunicacion", "nacionalRecreacion", "nacionalEducacion", "nacionalRestaurant", "nacionalBsSvsVarios", "nacionalEstacional", "nacionalNucleo", "nacionalRegulados", "nacionalBienes", "nacionalServicios",
                        "gbaNivelGeneral", "gbaAlimBebidasNoAlcohol", "gbaBebidasAlcoholTabaco", "gbaPrendasVestirCalzado", "gbaViviendaAgua", "gbaEquipamiento", "gbaSalud", "gbaTransporte", "gbaComunicacion", "gbaRecreacion", "gbaEducacion", "gbaRestaurant", "gbaBsSvsVarios", "gbaEstacional", "gbaNucleo", "gbaRegulados", "gbaBienes", "gbaServicios",
                        "pampeanaNivelGeneral", "pampeanaAlimBebidasNoAlcohol", "pampeanaBebidasAlcoholTabaco", "pampeanaPrendasVestirCalzado", "pampeanaViviendaAgua", "pampeanaEquipamiento", "pampeanaSalud", "pampeanaTransporte", "pampeanaComunicacion", "pampeanaRecreacion", "pampeanaEducacion", "pampeanaRestaurant", "pampeanaBsSvsVarios", "pampeanaEstacional", "pampeanaNucleo", "pampeanaRegulados", "pampeanaBienes", "pampeanaServicios",
@@ -70,6 +76,9 @@ def parseIPC(file_path, aCurrentTime):
                             "cuyoNivelGeneral", "cuyoAlimBebidasNoAlcohol", "cuyoBebidasAlcoholTabaco", "cuyoPrendasVestirCalzado", "cuyoViviendaAgua", "cuyoEquipamiento", "cuyoSalud", "cuyoTransporte", "cuyoComunicacion", "cuyoRecreacion", "cuyoEducacion", "cuyoRestaurant", "cuyoBsSvsVarios", "cuyoEstacional", "cuyoNucleo", "cuyoRegulados", "cuyoBienes", "cuyoServicios",
                             "patagoniaNivelGeneral", "patagoniaAlimBebidasNoAlcohol", "patagoniaBebidasAlcoholTabaco", "patagoniaPrendasVestirCalzado", "patagoniaViviendaAgua", "patagoniaEquipamiento", "patagoniaSalud", "patagoniaTransporte", "patagoniaComunicacion", "patagoniaRecreacion", "patagoniaEducacion", "patagoniaRestaurant", "patagoniaBsSvsVarios", "patagoniaEstacional", "patagoniaNucleo", "patagoniaRegulados", "patagoniaBienes", "patagoniaServicios"
     ]
+
+    # Set column names
+    data_df.columns = columnNames
 
 
     # date column without time
