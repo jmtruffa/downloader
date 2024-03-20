@@ -59,7 +59,7 @@ def parseIPC(file_path, aCurrentTime):
     data_df = data_df.T
 
     # Drop columns
-    columns_to_drop = [1, 2, 3, 17, 18, 22, 23] + list(range(26, 34,1)) + [47, 48, 52, 53] + list(range(56, 64, 1)) + [77, 78, 82, 83] + list(range(86,94,1)) + [107, 108, 112, 113] + list(range(116,124,1)) + [137, 138, 142, 143] + list(range(146,154,1)) + [167, 168, 172, 173] + list(range(176,184,1)) + [197, 198, 202, 203] + list(range(206,213,1))
+    columns_to_drop = [1, 2, 3, 17, 18, 22, 23] + list(range(26, 34,1)) + [47, 48, 52, 53] + list(range(56, 64, 1)) + [77, 78, 82, 83] + list(range(86,94,1)) + [107, 108, 112, 113] + list(range(116,124,1)) + [137, 138, 142, 143] + list(range(146,154,1)) + [167, 168, 172, 173] + list(range(176,184,1)) + [197, 198, 202, 203] + list(range(206,len(data_df.columns),1))
     data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
     
     # Drop rows
