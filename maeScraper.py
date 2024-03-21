@@ -6,6 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 import os
 from io import StringIO
+import time
 
 
 import pandas as pd
@@ -33,12 +34,18 @@ def download():
 
     try:
         # Wait for the table to be present in the DOM
-        table_element = WebDriverWait(driver, 10).until(
+        
+
+        time.sleep(5) #metemos igual unos segundos
+        
+        table_element = WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CLASS_NAME, 'table-components-container'))
         )
 
         # Extract the HTML of the table
         table_html = table_element.get_attribute('outerHTML')
+
+
 
         # Use pandas to read the HTML table into a DataFrame
         html_data = StringIO(table_html)
