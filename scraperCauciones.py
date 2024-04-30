@@ -87,7 +87,7 @@ def saveToDatabase(df):
         # use Date type for the 'date' column in the database to get rid of the time part
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = data_to_insert.to_sql(name = 'caucionesBYMA', con = db.engine, if_exists = 'append', index = False, dtype=dtypeMap, schema = 'public')
-        db.conn.commit()
+        #db.conn.commit()
         print(f"Number of records in caucionesBYMA inserted as reported by the postgres server: {result}.")
 
         # ahora grabamos la serie capitalizada
@@ -107,7 +107,7 @@ def saveToDatabase(df):
         # grabamos la serie capitalizada en la base de datos
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = serieCapitalizada_df.to_sql('caucionesCapitalizada', db.conn, if_exists='replace', index=False, dtype=dtypeMap, schema = 'public')
-        db.conn.commit()
+        #db.conn.commit()
         print(f"Number of records inserted as reported by the postgres server: {result}.")
 
 
@@ -192,6 +192,7 @@ if __name__ == "__main__":
 
     # Display the final result DataFrame
     saveToDatabase(final_df)
+    print(final_df)
 
     # Print the current time
     print(f"Finalizado script CAUCIONES a las : {datetime.now()}")
