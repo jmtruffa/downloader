@@ -22,7 +22,7 @@ def download(year = str(datetime.date.today().year)):
 
     # Download the XLS file from the URL
     try:
-        response = requests.get(url)
+        response = requests.get(url, verify=False)
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)
@@ -94,7 +94,7 @@ def parseSerieDiaria(year, file_path = None):
         dateAComparar = pd.to_datetime(datetime.date(data_df.loc[0, 'date'].year, 12, 31))
         data_df = data_df[data_df['date'] <= dateAComparar]
     
-    db = DatabaseConnection(db_type='postgresql', db_name='data')
+    db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
     dtypeMap = {'date': sqlalchemy.types.Date}
     
