@@ -50,7 +50,7 @@ def download():
 
     # Download the XLS file from the URL
     try:
-        response = requests.get(url)
+        response = requests.get(url, verify=False) # The server's SSL certificate is not verified. This should not be used in production.
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)
@@ -195,7 +195,7 @@ def depositos(file_path = None):
     data_df.columns = column_definitions
 
     data_df.to_sql('depositos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
-    db.execute_query("SELECT agregadosprivados();")
+    db.execute_query("CALL agregadosprivados();") ##db.execute_query("SELECT agregadosprivados();")
 
     # acá vamos a calcular las variaciones anuales de los agregados privados
     df_varAg = varAgregados()
