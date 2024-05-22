@@ -2,6 +2,7 @@ import os
 import tempfile
 import pandas as pd
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 from dataBaseConn import DatabaseConnection
 from datetime import datetime
 
@@ -18,6 +19,7 @@ def downloadCER():
 
     # Download the XLS file from the URL 
     try:
+        # Disable SSL certificate verification and warnings to avoid errors
         response = requests.get(url, verify=False)
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
