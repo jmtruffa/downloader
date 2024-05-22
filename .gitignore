@@ -4,4 +4,4 @@
 emails.csv
 emailsPostgres.csv
 tempEnvVars.sh
-/venv/
+/venv
