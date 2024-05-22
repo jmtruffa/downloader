@@ -388,6 +388,5 @@ if __name__ == "__main__":
         else:
             print(f"An error occurred while downloading {func.__name__}")
     os.remove(file_path)
-    db.conn.commit()
     db.disconnect()
     print("Temporary file deleted.")
