@@ -2,6 +2,7 @@ import os
 import tempfile
 import pandas as pd
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 from dataBaseConn2 import DatabaseConnection
 from datetime import datetime
 import sqlalchemy
@@ -18,7 +19,8 @@ def downloadA3500():
 
     # Download the XLS file from the URL
     try:
-        response = requests.get(url)
+        requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+        response = requests.get(url, verify=False) 
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)

@@ -116,7 +116,7 @@ def parseSerieDiaria(year, file_path = None):
         
     print(f"Inserting or updating {len(data_df)} rows into serieDiaria")
     data_df.to_sql(name = "serieDiaria", con = db.conn, if_exists = 'append', index = False, dtype = dtypeMap)
-    db.conn.commit()
+    #db.conn.commit()
     
     if file_path == None:
         os.remove(file_path)

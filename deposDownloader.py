@@ -107,7 +107,7 @@ if __name__ == "__main__":
     file_path = download()
 
     if file_path == False:
-        sys.exit()
+        sys.exit("file.path es False. No se pudo descargar el archivo o no hay datos para el año solicitado. Saliendo...")
     
     print("Serie diaria de depositos descargada. Actualizando base de datos...")
 
