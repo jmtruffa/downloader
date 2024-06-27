@@ -34,7 +34,7 @@ def varAgregados():
 
     ag.to_sql(name='varAgregados', con=db.conn, if_exists='replace', index=False, schema='public', dtype=dtypeMap)
     # commit
-    db.conn.commit()
+    #db.conn.commit()
 
     return ag
 
