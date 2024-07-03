@@ -44,7 +44,7 @@ def parseSerieDiaria(year, file_path = None):
         file_path = download()
 
     # Read the XLSM file
-    data_df = pd.read_excel(file_path, sheet_name="Serie_diaria", skiprows=26, usecols="A:AG", header=None)
+    data_df = pd.read_excel(file_path, sheet_name="Serie_diaria", skiprows=26, usecols="A:AI", header=None)
 
     columns_to_drop = [0, 1, 6]
     data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
@@ -78,7 +78,9 @@ def parseSerieDiaria(year, file_path = None):
     "princPasSaldosPESOSPosNetaPasesTotal",
     "princPasSaldosPESOSPosNetaPasesPasesPasivos",
     "princPasSaldosPESOSPosNetaPasesPasesActivos",
+    "princPasSaldosTOTALDepGobierno",
     "princPasSaldosPESOSDepGobierno",
+    "princPasSaldosMEDepGobierno",
     "redescuentosAdelantos",
     "tipoCambio"
     )
