@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 import datetime
-
+from dataBaseConn import DatabaseConnection
 import sys
 import sqlalchemy
 
@@ -42,14 +42,83 @@ def parsePases(file_path = None):
     """
     Parsea el archivo de pases del BCRA que viene en format XLSX
     """
-    pass
+    # Read the specified range "A:B" from the first sheet
+    data_df = pd.read_excel(file_path, sheet_name=0, usecols="A:V", skiprows=3)
+
+    column_definitions = (
+        "date",
+        "ppRueda",
+        "ppPlazo",
+        "pptasa",
+        "ppConcertacionesPublico",
+        "ppConcertacionesPrivado",
+        "ppConcertacionesOperadoBCRA",
+        "ppStockPublico",
+        "ppStockPrivado",
+        "ppStockTotal",
+        "paRueda",
+        "paPlazo",
+        "paptasa",
+        "paConcertacionesPublico",
+        "paConcertacionesPrivado",
+        "paConcertacionesOperadoBCRA",
+        "paStockPublico",
+        "paStockPrivado",
+        "paStockTotal",
+        "tasaRefRIX",
+        "montoOperado",
+        "TPM"
+    )
+
+    data_df.columns = column_definitions
+
+    data_df = data_df[pd.to_datetime(data_df['date'], format="%Y-%m-%d %H:%M:%S", errors='coerce').notna()]
+    
+    data_df['date'] = pd.to_datetime(data_df['date'], format="%Y-%m-%d %H:%M:%S").dt.date
+
+    return data_df
 
 
 def graba(df):
     """
     Graba el dataframe en la base de datos
     """
-    pass
+    # Create a connection to the database
+    db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
+    db.connect()
+
+    # Check if the table exists
+    table_exists_query = f"""
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'pases'
+    """
+    result = pd.read_sql(table_exists_query, db.conn)
+
+    if result.empty:
+        data_to_insert = df
+    else:
+        query = f'SELECT MAX(date) FROM "pases"'
+        last_date = pd.read_sql(query, db.conn).iloc[0,0]
+        # convert to datetime in order to compare to the date column in data_df
+        last_date = pd.to_datetime(last_date)
+
+        # Filter the data to insert
+        data_to_insert = df[df['date'] > last_date]
+
+    # Insert the data into the database
+    if len(data_to_insert) == 0:
+        print("No hay datos nuevos que grabar")
+    else:
+        print(f"Inserting {len(data_to_insert)} rows into pases Table")
+        # use Date type for the 'date' column in the database to get rid of the time part
+       # dtypeMap = {'date': sqlalchemy.types.Date, 'settleDate': sqlalchemy.types.Date}
+        result = data_to_insert.to_sql(name = 'pases', con = db.engine, if_exists = 'append', index = False, schema = 'public')
+        print(f"Number of records inserted as reported by the postgres server: {result}.")
+
+    db.disconnect()
+
+    return True
 
 
 if __name__ == "__main__":
