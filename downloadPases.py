@@ -76,6 +76,9 @@ def parsePases(file_path = None):
     
     data_df['date'] = pd.to_datetime(data_df['date'], format="%Y-%m-%d %H:%M:%S").dt.date
 
+    # limpiamos los valores nulos ya que la última fecha parece que viene cargada pero sin datos
+    data_df = data_df.dropna(subset=['ppStockTotal']) 
+
     return data_df
 
 
@@ -123,6 +126,7 @@ def graba(df):
 
 if __name__ == "__main__":
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("--------------------------------------------")
     print(f"Descargando archivo de pases a las {current_time}")
     file_path = download()
     if file_path:
@@ -133,8 +137,10 @@ if __name__ == "__main__":
             graba(df)
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"Proceso finalizado a las {current_time}. Borrando archivo descargado.")
+            print("--------------------------------------------")
             os.remove(file_path)
     else:
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print("Error descargando el archivo. Saliendo a las {current_time}")
+        print("--------------------------------------------")
         sys.exit(1)
