@@ -192,7 +192,7 @@ if __name__ == "__main__":
 
     # Display the final result DataFrame
     saveToDatabase(final_df)
-    print(final_df)
+   # print(final_df)
 
     # Print the current time
     print(f"Finalizado script CAUCIONES a las : {datetime.now()}")
