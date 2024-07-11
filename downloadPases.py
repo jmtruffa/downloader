@@ -107,7 +107,8 @@ def graba(df):
         last_date = pd.to_datetime(last_date)
 
         # Filter the data to insert
-        data_to_insert = df[df['date'] > last_date]
+        data_to_insert = df[df['date'].dt.date > last_date]
+        #data_to_insert = df[df['date'] > last_date]
 
     # Insert the data into the database
     if len(data_to_insert) == 0:
