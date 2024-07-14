@@ -119,7 +119,7 @@ def saveIPC(df, aCurrentTime):
         # use Date type for the 'date' column in the database to get rid of the time part
         dtypeMap = {'date': sqlalchemy.types.Date}
         result = df.to_sql(name = 'IPCIndec', con = db.engine, if_exists = 'replace', index = False, dtype=dtypeMap, schema = 'public')
-        db.conn.commit()
+        #db.conn.commit()
         print(f"Number of records inserted as reported by the postgres server: {result}") 
 
     
