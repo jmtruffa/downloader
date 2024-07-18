@@ -2,6 +2,7 @@ import os
 import tempfile
 import pandas as pd
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 from dataBaseConn2 import DatabaseConnection
 from datetime import datetime
 import sqlalchemy
@@ -19,7 +20,8 @@ def downloadITCRM():
 
     # Download the XLS file from the URL
     try:
-        response = requests.get(url)
+        requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+        response = requests.get(url, verify=False) 
         response.raise_for_status()  # Check if the request was successful
         with open(file_path, "wb") as file:
             file.write(response.content)
@@ -30,23 +32,16 @@ def downloadITCRM():
     print("------------------------------------")
     print("ITCRM downloaded successfully at " + currentTime)
 
-    # Read the Excel file until an empty row is encountered
-    data_rows = []
-    with pd.ExcelFile(file_path) as xls:
-        sheet_name = xls.sheet_names[0]
-        for row in pd.read_excel(xls, sheet_name, header=None, skiprows=2, dtype=str).values:
-            if pd.notna(row[0]):
-                data_rows.append(row)
-            else:
-                break
-    # Convert the data rows to a DataFrame
-    data_df = pd.DataFrame(data_rows, columns=["date", "ITCRM", "ITCRBBrasil", "ITCRBCanada", "ITCRBChile", "ITCRBEEUU",
+    print(f"Reading the Excel file...{file_path}")
+    data_df = pd.read_excel(file_path, skiprows=1)
+    print("Excel file read successfully")
+    # Rename the columns
+    columns = columns=["date", "ITCRM", "ITCRBBrasil", "ITCRBCanada", "ITCRBChile", "ITCRBEEUU",
                                                "ITCRBMexico", "ITCRMUruguay", "ITCRMChina", "ITCRMIndia", "ITCRMJapon", "ITCRMUK",
-                                               "ITCRMSuiza", "ITCRMZonaEuro", "ITCRMVietname", "ITCRMSudamerica"])
+                                               "ITCRMSuiza", "ITCRMZonaEuro", "ITCRMVietname", "ITCRMSudamerica"]
+    data_df.columns = columns
 
-
-
-    # Convert the "date" column to datetime format, ignoring text
+    # Convert the "date" column to datetime format, ignoring text with errors='coerce'
     data_df["date"] = pd.to_datetime(data_df["date"], errors='coerce')
     # Filter out rows with NaT (text)
     data_df = data_df.dropna(subset=["date"])
@@ -58,20 +53,23 @@ def downloadITCRM():
                                                                                                 "ITCRMSuiza", "ITCRMZonaEuro", "ITCRMVietname", "ITCRMSudamerica"]].apply(pd.to_numeric, errors='coerce')
     
     
-    db = DatabaseConnection(db_type="postgresql", db_name=os.environ.get('POSTGRES_DB'))
-    db.connect()
+    
     
     # Not need to check if table exists, since ITCRM is constantly recalculated backwards
 
     if len(data_df) == 0:
         print("No rows to be inserted. Exiting...")
-    else:
-        print(f"Inserting {len(data_df)} rows into ITCRM Table")
-        # use Date type for the 'date' column in the database to get rid of the time part
-        dtypeMap = {'date': sqlalchemy.types.Date}
-        result = data_df.to_sql(name = 'ITCRM', con = db.engine, if_exists = 'replace', index = False, dtype=dtypeMap, schema = 'public')
-        db.conn.commit()
-        print(f"Number of records inserted as reported by the postgres server: {result}") 
+        return False
+    
+    db = DatabaseConnection(db_type="postgresql", db_name=os.environ.get('POSTGRES_DB'))
+    db.connect()
+
+    print(f"Inserting {len(data_df)} rows into ITCRM Table")
+    # use Date type for the 'date' column in the database to get rid of the time part
+    dtypeMap = {'date': sqlalchemy.types.Date}
+    result = data_df.to_sql(name = 'ITCRM', con = db.engine, if_exists = 'replace', index = False, dtype=dtypeMap, schema = 'public')
+    #db.conn.commit()
+    print(f"Number of records inserted as reported by the postgres server: {result}") 
     
     # Disconnect from the database
     db.disconnect()
