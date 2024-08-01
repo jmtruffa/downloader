@@ -72,7 +72,7 @@ def bm(file_path = None):
         file_path = download()
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
-    data_df = pd.read_excel(file_path, sheet_name="BASE MONETARIA", usecols="A:AF", skiprows=8)
+    data_df = pd.read_excel(file_path, sheet_name="BASE MONETARIA", usecols="A:AG", skiprows=8)
     
     columns_to_drop = [1, 15, 23]
     data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
@@ -90,6 +90,7 @@ def bm(file_path = None):
       "vdFePasesLeliqIntereses",
       "vdFeLebacNobac",
       "vdFeRescateCuasi",
+      "vdFeOperacionesLEFI",
       "vdFeOtros",
       "vdBMCMBilletesPublico",
       "vdBMCMBilletesEntidades",
