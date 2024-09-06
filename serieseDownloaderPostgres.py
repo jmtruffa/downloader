@@ -6,10 +6,11 @@ from urllib3.exceptions import InsecureRequestWarning
 from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
 from datetime import datetime
+from sqlalchemy import create_engine, text
 
 def varAgregados():
     
-    ag = pd.read_sql_query('SELECT * FROM "agregadosPrivados"', con=db.conn)
+    ag = pd.read_sql_query('SELECT * FROM "agregadosPrivados"', con=engine)
 
     
 
@@ -33,7 +34,7 @@ def varAgregados():
 
     dtypeMap = {'date': sqlalchemy.types.Date}
 
-    ag.to_sql(name='varAgregados', con=db.conn, if_exists='replace', index=False, schema='public', dtype=dtypeMap)
+    ag.to_sql(name='varAgregados', con=engine, if_exists='replace', index=False, schema='public', dtype=dtypeMap)
     # commit
     #db.conn.commit()
 
@@ -110,7 +111,7 @@ def bm(file_path = None):
     
     data_df.columns = column_definitions
     
-    data_df.to_sql('bmBCRA', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    data_df.to_sql('bmBCRA', engine, if_exists='replace', index=False, dtype=dtypeMap)
 
 
     if file_path == None:
@@ -145,7 +146,7 @@ def reservas(file_path = None):
     
     data_df.columns = column_definitions
 
-    data_df.to_sql('reservas', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    data_df.to_sql('reservas', engine, if_exists='replace', index=False, dtype=dtypeMap)
     
 
     # Delete the temporary file if it was not passed as an argument
@@ -197,13 +198,15 @@ def depositos(file_path = None):
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('depositos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
-    db.execute_query("CALL agregadosprivados();") ##db.execute_query("SELECT agregadosprivados();")
+    data_df.to_sql('depositos', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    with engine.connect() as con:
+        con.execute(text("CALL agregadosprivados();"))
+    #engine.connect.execute("CALL agregadosprivados();") ##db.execute_query("SELECT agregadosprivados();")##
 
     # acá vamos a calcular las variaciones anuales de los agregados privados
     df_varAg = varAgregados()
 
-    df_varAg.to_sql('varAnualAgregadosPrivados', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    df_varAg.to_sql('varAnualAgregadosPrivados', engine, if_exists='replace', index=False, dtype=dtypeMap)
     
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -247,7 +250,7 @@ def prestamos(file_path = None):
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('prestamos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    data_df.to_sql('prestamos', engine, if_exists='replace', index=False, dtype=dtypeMap)
 
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -290,7 +293,7 @@ def tasas(file_path = None):
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('tasas', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    data_df.to_sql('tasas', engine, if_exists='replace', index=False, dtype=dtypeMap)
 
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -304,8 +307,7 @@ def instrumentos(file_path = None):
 
             file_path = download() 
 
-    data_df = pd.read_excel(file_path, sheet_name="INSTRUMENTOS DEL BCRA", usecols="A:AS", skiprows=9, header=None)
-    
+    data_df = pd.read_excel(file_path, sheet_name="INSTRUMENTOS DEL BCRA", usecols="A:AU", skiprows=9, header=None)
     column_definitions = (
       "date",
       "saldosPasesPasivosPesosTotal",
@@ -351,12 +353,18 @@ def instrumentos(file_path = None):
       "tasaNobacPesosVariableBadlarBcoPriv1A",
       "tasaNobacPesosVariableBadlarTotal2A",
       "tasaNobacPesosVariableBadlarBcoPriv2A",
-      "tasaNotaliqPesosVariableTasaPolMon190d"
+      "tasaNotaliqPesosVariableTasaPolMon190d",
+      "vacio",
+      "saldolefi"
     )
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('instrumentos', db.conn, if_exists='replace', index=False, dtype=dtypeMap)
+    # drop columna "vacio"
+    data_df = data_df.drop(columns=["vacio"])
+
+    data_df.to_sql('instrumentos', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    
 
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -364,32 +372,27 @@ def instrumentos(file_path = None):
     
     return True
 
-def main():
-    file_path = download()
-    for func in [bm, reservas, depositos, prestamos, tasas, instrumentos]:
-        func(file_path)
-        if func(file_path):
-            print(f"{func.__name__} downloaded successfully")
-        else:
-            print(f"An error occurred while downloading {func.__name__}")
-    os.remove(file_path)
-    print("Temporary file deleted.")
-
 
 # Example usage
 if __name__ == "__main__":
     file_path = download()
-    db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
-    db.connect()
+    db_user = os.environ.get('POSTGRES_USER')
+    db_password = os.environ.get('POSTGRES_PASSWORD')
+    db_host = os.environ.get('POSTGRES_HOST')
+    db_port = os.environ.get('POSTGRES_PORT', '5432')  # Default port for PostgreSQL is 5432
+    db_name = os.environ.get('POSTGRES_DB')
+    engine = create_engine(f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
+    #db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
+    #db.connect()
     # use Date type for the 'date' column in the database to get rid of the time part
     dtypeMap = {'date': sqlalchemy.types.Date}
+    
     for func in [bm, reservas, depositos, prestamos, tasas, instrumentos]:
-        func(file_path)
         if func(file_path):
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{func.__name__} parsed successfully at {current_time}")
         else:
             print(f"An error occurred while downloading {func.__name__}")
     os.remove(file_path)
-    db.disconnect()
+    #db.disconnect()
     print("Temporary file deleted.")
