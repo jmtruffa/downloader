@@ -3,10 +3,17 @@ import tempfile
 import pandas as pd
 import requests
 from urllib3.exceptions import InsecureRequestWarning
-from dataBaseConn2 import DatabaseConnection
+#from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
 from datetime import datetime
 from sqlalchemy import create_engine, text
+
+db_user = os.environ.get('POSTGRES_USER')
+db_password = os.environ.get('POSTGRES_PASSWORD')
+db_host = os.environ.get('POSTGRES_HOST')
+db_port = os.environ.get('POSTGRES_PORT', '5432')  # Default port for PostgreSQL is 5432
+db_name = os.environ.get('POSTGRES_DB')
+dtypeMap = {'date': sqlalchemy.types.Date}
 
 def varAgregados():
     
@@ -376,16 +383,11 @@ def instrumentos(file_path = None):
 # Example usage
 if __name__ == "__main__":
     file_path = download()
-    db_user = os.environ.get('POSTGRES_USER')
-    db_password = os.environ.get('POSTGRES_PASSWORD')
-    db_host = os.environ.get('POSTGRES_HOST')
-    db_port = os.environ.get('POSTGRES_PORT', '5432')  # Default port for PostgreSQL is 5432
-    db_name = os.environ.get('POSTGRES_DB')
+
     engine = create_engine(f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
     #db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
     #db.connect()
     # use Date type for the 'date' column in the database to get rid of the time part
-    dtypeMap = {'date': sqlalchemy.types.Date}
     
     for func in [bm, reservas, depositos, prestamos, tasas, instrumentos]:
         if func(file_path):
