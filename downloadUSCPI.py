@@ -22,15 +22,18 @@ def download_USCPI_data():
     
     # Configurar Selenium para usar Chrome en modo headless
     chrome_options = Options()
-    chrome_options.add_argument('--headless')
+   # chrome_options.add_argument('--headless')
+
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
     driver = webdriver.Chrome(options=chrome_options)
+    
 
     try:
         # Navegar a la URL
         driver.get(url)
+        print(driver.execute_script("return navigator.userAgent;"))
 
         # Esperar unos segundos para asegurarse de que la página se cargue completamente
         time.sleep(5)
