@@ -19,8 +19,10 @@ def download_USCPI_data():
     """Descarga los datos de USCPI desde la web utilizando Selenium y retorna un DataFrame filtrado por series_id"""
     
     url = "https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems"
+
+   # Debe ser corrido con xvfb-run -a downloadUSCPI para que funcione 
     
-    # Configurar Selenium para usar Chrome en modo headless
+   #  Configurar Selenium para usar Chrome en modo headless
     chrome_options = Options()
    # chrome_options.add_argument('--headless')
 
@@ -33,8 +35,7 @@ def download_USCPI_data():
     try:
         # Navegar a la URL
         driver.get(url)
-        print(driver.execute_script("return navigator.userAgent;"))
-
+        
         # Esperar unos segundos para asegurarse de que la página se cargue completamente
         time.sleep(5)
 
