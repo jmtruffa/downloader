@@ -5,3 +5,6 @@ emails.csv
 emailsPostgres.csv
 tempEnvVars.sh
 /venv
+vars.sh
+.DS_Store
+.gitignore
