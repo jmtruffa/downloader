@@ -67,9 +67,6 @@ def base_monetaria(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_base_monetaria'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="D:G", skiprows=25)
@@ -106,10 +103,7 @@ def tasa_interes(file_path = None):
 
         file_path = download()
 
-    # Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_tasa_interes'))
-
+    
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="I:L", skiprows=25)
 
@@ -149,9 +143,6 @@ def tipo_cambio(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_tipo_cambio'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="N:P", skiprows=25)
@@ -186,9 +177,6 @@ def agreg_monetarios(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_agreg_monetarios'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="R:T", skiprows=25)
@@ -222,9 +210,6 @@ def liquidez_entidades(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_liquidez_entidades'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="V:W", skiprows=25)
@@ -259,10 +244,6 @@ def tasa_interes_depositos(file_path = None):
     if file_path == None:
 
         file_path = download()
-
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_tasa_interes_depositos'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="Y:AB", skiprows=25)
@@ -299,9 +280,6 @@ def tasa_interes_prestamos(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_tasa_interes_prestamos'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="AD:AF", skiprows=25)
@@ -339,9 +317,6 @@ def depositos_privados(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_depositos_privados'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="AH:AK", skiprows=25)
@@ -379,9 +354,6 @@ def prestamos_privados(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_prestamos_privados'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="AM:AP", skiprows=25)
@@ -418,9 +390,6 @@ def prest_dep_otras_monedas_privados(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_prest_dep_otras_monedas_privados'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="AR:AT", skiprows=25)
@@ -456,9 +425,6 @@ def pasivos_pesos_bcra(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_pasivos_pesos_bcra'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="AV:AW", skiprows=25)
@@ -497,9 +463,6 @@ def factores_variacion(file_path = None):
 
         file_path = download()
 
-# Conectar a la base de datos y eliminar todos los registros de la tabla antes de la inserción
-    with engine.connect() as connection:
-       connection.execute(text('DELETE FROM infomond_factores_variacion'))
 
     # Read the specified range "A:AF" from the "BASE MONETARIA" sheet, skip first 8 rows
     data_df = pd.read_excel(file_path, sheet_name="DATOS | DATA", usecols="AY:BE", skiprows=25)
