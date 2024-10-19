@@ -1,10 +1,11 @@
 /CERDownloaderOld.py
 /__pycache__
+/path
 /xlsDownloader.py
 emails.csv
 emailsPostgres.csv
 tempEnvVars.sh
 /venv
-vars.sh
 .DS_Store
-.gitignore
+launch.json
+
