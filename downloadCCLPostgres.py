@@ -32,6 +32,7 @@ def downloadCCL():
 
     # Create a DatabaseConnection instance
     #db = DatabaseConnection("/home/juant/data/historicalData.sqlite3")
+    #db = sqlalchemy.create_engine(f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
     db = DatabaseConnection(db_type='postgresql', db_name=os.environ.get('POSTGRES_DB'))
     db.connect()
 
@@ -72,9 +73,17 @@ def downloadCCL():
         df = df.pivot(index='dateTime', columns='spot', values='normalizedPrice')
 
         # Create the 'ccl' column
-        df['ccl'] = df['CCL'].combine_first(df['CCL3']).combine_first(df['CCL2']).combine_first(df['CCL1'])
+        # Start combining columns, check each column for existence
+        df['ccl'] = df['CCL'].combine_first(df['CCL3'])
+        if 'CCL2' in df.columns:
+            df['ccl'] = df['ccl'].combine_first(df['CCL2'])
+        if 'CCL1' in df.columns:
+            df['ccl'] = df['ccl'].combine_first(df['CCL1'])
+
+        #df['ccl'] = df['CCL'].combine_first(df['CCL3']).combine_first(df['CCL2']).combine_first(df['CCL1'])
         df['ccl3'] = df['CCL3'].astype(float)
-        df = df.drop(columns=['CCL', 'CCL3', 'CCL2', 'CCL1'])
+        #df = df.drop(columns=['CCL', 'CCL3', 'CCL2', 'CCL1'])
+        df = df.drop(columns=[col for col in df.columns if 'CCL' in col])
         
 
         # Convert 'ccl' to double
@@ -91,8 +100,9 @@ def downloadCCL():
         # Append the DataFrame to the database table
         #df.to_sql(name = 'cclTemp', con = db.conn, if_exists = 'append', index = True, index_label = 'date')
         dtypeMap = {'date': sqlalchemy.types.Date}
+
         rowsInserted = df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date', dtype=dtypeMap, schema = 'public')
-        #db.conn.commit() # agregado porque decía que grababa pero no lo hacía
+        db.conn.commit() # agregado porque decía que grababa pero no lo hacía
 
         # print number of rows inserted
         print(f"Inserted {rowsInserted} rows")
