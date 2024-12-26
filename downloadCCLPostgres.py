@@ -74,7 +74,11 @@ def downloadCCL():
 
         # Create the 'ccl' column
         # Start combining columns, check each column for existence
-        df['ccl'] = df['CCL'].combine_first(df['CCL3'])
+        if 'CCL' in df.columns:
+            df['ccl'] = df['CCL'].combine_first(df['CCL3'])
+        else:
+            df['ccl'] = df['CCL3']
+        #df['ccl'] = df['CCL'].combine_first(df['CCL3'])
         if 'CCL2' in df.columns:
             df['ccl'] = df['ccl'].combine_first(df['CCL2'])
         if 'CCL1' in df.columns:
