@@ -10,8 +10,20 @@ def make_request(url):
     
     # Request headers
     headers = {
-        "Content-Type": "application/json",
-    }
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9,es-US;q=0.8,es;q=0.7',
+    'Cache-Control': 'no-cache,no-store,max-age=1,must-revaliidate',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/json',
+    'Expires': '1',
+    'Options': 'renta-fija',
+    'Origin': 'https://open.bymadata.com.ar',
+    'Pragma': 'no-cache'
+}
+    #     "Content-Type": "application/json;charset=UTF-8",
+    #     #"Content-Type": "application/json",
+    #     "token": "dc826d4c2dde7519e882a250359a23a0"
+    # }
 
     # Request payload
     payload = {
