@@ -201,10 +201,10 @@ if __name__ == "__main__":
         if df is not None:
             final_df = final_df._append(df, ignore_index=True)
 
-
-    # Display the final result DataFrame
-    saveToDatabase(final_df)
-   # print(final_df)
+    if final_df is not None:
+        saveToDatabase(final_df)
+    else:
+        print("Exiting via no records to save.")
 
     # Print the current time
     print(f"Finalizado script CAUCIONES a las : {datetime.now()}")

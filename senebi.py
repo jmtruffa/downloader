@@ -167,4 +167,9 @@ if __name__ == "__main__":
                 final_df = final_df._append(df, ignore_index=True)
 
     # Display the final result DataFrame
-    saveToDatabase(final_df)
+    if final_df is not None:
+        saveToDatabase(final_df)
+    else:
+        print("Exiting via no records to save.")
+
+    print(f"Finalizado script SENEBI a las : {datetime.now()}")
