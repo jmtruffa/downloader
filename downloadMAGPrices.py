@@ -81,11 +81,11 @@ def download(date_pairs):
                 df.columns = ['date', 'categoria', 'precioMinimo', 'precioMaximo', 'precioPromedio', 'precioMediana', 'totalCabezas', 'importe', 'kgs', 'promKgs']
                 df = df.dropna()
 
-
-
-
-                # Append the current DataFrame to the overall result
-                all_data = pd.concat([all_data, df], ignore_index=True)
+                # Append the current DataFrame to the overall result checking all_data and df are not empty
+                if not df.empty and not all_data.empty:
+                    all_data = pd.concat([all_data, df], ignore_index=True)
+                elif not df.empty:
+                    all_data = df.copy()  # Directly assign df if all_data is empty
 
             except Exception as e:
                 print(f"An error occurred: {e}")
@@ -98,16 +98,25 @@ def download(date_pairs):
 
         #all_data['totalCabezas'] = all_data['totalCabezas'].str[:-2] + '.' + all_data['totalCabezas'].str[-2:]
         #all_data['totalCabezas'] = all_data['totalCabezas'].str.replace("[.]", "")
-        all_data['totalCabezas'] = all_data['totalCabezas'].replace("[\.]", "", regex=True)
-
+        
+        # esta línea la comenté para hacer la corrección que me estaba indicando en el escape del .   all_data['totalCabezas'] = all_data['totalCabezas'].replace("[\.]", "", regex=True)
+        all_data['totalCabezas'] = all_data['totalCabezas'].replace(r"\.", "", regex=True)
+        
         # filter out any non numeric characters in th ecolumn importe and divide by 100
-        all_data["importe"] = all_data["importe"].replace('[\$,.]', '', regex=True)
+        
+        # esta linea también corregir el \ innecesario dentro de []  all_data["importe"] = all_data["importe"].replace('[\$,.]', '', regex=True)
+        all_data["importe"] = all_data["importe"].replace(r"[$,.]", "", regex=True)
 
         #all_data["importe"] = all_data["importe"].str.replace("[^0-9]", "")
         #all_data['kgs'] = all_data['kgs'].str[:-2] + '.' + all_data['kgs'].str[-2:]
-        all_data['kgs'] = all_data['kgs'].replace("[\.]", "", regex=True)
-        all_data["promKgs"] = all_data["promKgs"].replace("[\.]", "", regex=True)
         
+        #all_data['kgs'] = all_data['kgs'].replace("[\.]", "", regex=True)
+        all_data['kgs'] = all_data['kgs'].replace(r"\.", "", regex=True)
+
+        #all_data["promKgs"] = all_data["promKgs"].replace("[\.]", "", regex=True)
+        all_data["promKgs"] = all_data["promKgs"].str.replace(r"\D", "", regex=True)
+        
+
         # cast columns to numeric
         all_data['date'] = pd.to_datetime(all_data['date'], format="%d/%m/%Y").dt.strftime("%Y-%m-%d")
         all_data["precioMinimo"] = all_data["precioMinimo"] / 1000
