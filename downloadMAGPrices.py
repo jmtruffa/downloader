@@ -89,6 +89,11 @@ def download(date_pairs):
 
             except Exception as e:
                 print(f"An error occurred: {e}")
+        # Ponemos un control de si all_data está vacío y salimos
+        if all_data.empty:
+            print("No hay datos para actualizar. Saliendo...")
+            sys.exit()
+
 
         # Put decimal place in the third position from the right in columns precioMinimo, precioMaximo, precioPromedio, precioMediana, kgs
         #all_data['precioMinimo'] = all_data['precioMinimo'].str[:-2] + '.' + all_data['precioMinimo'].str[-2:]
