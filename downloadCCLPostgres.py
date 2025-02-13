@@ -105,16 +105,42 @@ def downloadCCL():
         #df.to_sql(name = 'cclTemp', con = db.conn, if_exists = 'append', index = True, index_label = 'date')
         dtypeMap = {'date': sqlalchemy.types.Date}
 
-        rowsInserted = df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date', dtype=dtypeMap, schema = 'public')
-        db.conn.commit() # agregado porque decía que grababa pero no lo hacía
+        try:
+            # Creamos un engine desde la conexión si no existe
+            if not hasattr(db, 'engine'):
+                db.engine = db.conn.engine
 
-        # print number of rows inserted
-        print(f"Inserted {rowsInserted} rows")
+            # Iniciamos una transacción usando el contexto
+            with db.engine.begin() as connection:
+                # Save the df to the postgres database
+                dtypeMap = {'date': sqlalchemy.types.Date}
+                rowsInserted = df.to_sql(
+                    name='ccl',
+                    con=connection,
+                    if_exists='append',
+                    index=True,
+                    index_label = 'date',
+                    dtype=dtypeMap,
+                    schema='public'
+                )
+                
+                print(f"Inserted {rowsInserted} rows")
+                
+        except Exception as e:
+            print(f"Error al guardar en la base de datos: {e}")
+            raise
+
+        # rowsInserted = df.to_sql(name = 'ccl', con = db.conn, if_exists = 'append', index = True, index_label = 'date', dtype=dtypeMap, schema = 'public')
+        # db.conn.commit() # agregado porque decía que grababa pero no lo hacía
+
+        # # print number of rows inserted
+        # print(f"Inserted {rowsInserted} rows")
 
     else:
         print("No data to insert")
 
     # Disconnect from the database
+    print("Desconectando de la base de datos...")
     db.disconnect()
 
 

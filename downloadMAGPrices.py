@@ -175,19 +175,67 @@ def getStartDate(db):
     return(newDate)
 
 def saveToDatabase(df, db):
-    """Graba los datos en la base de datos postgres"""
-
+    """
+    Graba los datos en la base de datos postgres usando SQLAlchemy
+    con manejo apropiado de transacciones.
     
+    Args:
+        df: DataFrame de pandas con los datos a guardar
+        db: Instancia de DatabaseConnection
+    """
+    try:
+        # Creamos un engine desde la conexión si no existe
+        if not hasattr(db, 'engine'):
+            db.engine = db.conn.engine
 
-    # Save the df to the postgres database updating the existing data. If exists, replace it
-    dtypeMap = {'date': sqlalchemy.types.Date}
-    rowsInserted = df.to_sql(name = 'MAGPrices', con = db.conn, if_exists = 'append', index = False, dtype=dtypeMap, schema = 'public')
-    db.conn.commit() # agregado porque decía que grababa pero no lo hacía
+        # Iniciamos una transacción usando el contexto
+        with db.engine.begin() as connection:
+            # Save the df to the postgres database
+            dtypeMap = {'date': sqlalchemy.types.Date}
+            rows_inserted = df.to_sql(
+                name='MAGPrices',
+                con=connection,
+                if_exists='append',
+                index=False,
+                dtype=dtypeMap,
+                schema='public'
+            )
+            
+            print(f"Inserted {rows_inserted} rows")
+            
+    except Exception as e:
+        print(f"Error al guardar en la base de datos: {e}")
+        raise
 
-    # print number of rows inserted
-    print(f"Inserted {rowsInserted} rows")
+# def saveToDatabase(df, db):
+#     """Graba los datos en la base de datos postgres"""  
+#     # Save the df to the postgres database updating the existing data. If exists, replace it
+    
+#     dtypeMap = {'date': sqlalchemy.types.Date}
+    
+#     # Obtener una conexión explícita desde el engine
 
-    # Close the database connection
+
+#     rowsInserted = df.to_sql(
+#         name='MAGPrices',
+#         con=db.conn,  # Pasamos el engine directamente
+#         if_exists='append',
+#         index=False,
+#         dtype=dtypeMap,
+#         schema='public'
+#     )
+
+#     print(f"Inserted {rowsInserted} rows")
+
+
+
+#     # rowsInserted = df.to_sql(name = 'MAGPrices', con = db.conn, if_exists = 'append', index = False, dtype=dtypeMap, schema = 'public')
+#     # db.conn.commit() # agregado porque decía que grababa pero no lo hacía
+
+#     # print number of rows inserted
+#     print(f"Inserted {rowsInserted} rows")
+
+#     # Close the database connection
 
 
 if __name__ == "__main__":
