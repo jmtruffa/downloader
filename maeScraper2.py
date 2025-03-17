@@ -35,7 +35,7 @@ def fetch_forex_data():
     df = pd.DataFrame(data)
     
     # Convert 'Fecha' to proper date format
-    df['date'] = pd.to_datetime(df['Fecha'], format='%d%m%y', errors='coerce')
+    df['date'] = pd.to_datetime(df['Fecha'], format='%y%m%d', errors='coerce')
     
     # Extract currency details from 'Titulo'
     df_extracted = df['Titulo'].str.extract(pattern)
