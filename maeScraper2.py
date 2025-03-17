@@ -52,7 +52,6 @@ def fetch_forex_data():
     # Rename columns to match database structure
     df = pd.concat([df, df_extracted], axis=1)
     df.rename(columns={'Titulo': 'instrumento', 'Rueda': 'rueda'}, inplace=True)
-    print(df[['date', 'rueda', 'instrumento', 'currency_out', 'currency_in', 'settle', 'settle_date', 'monto', 'cotizacion', 'hora']])
     
     return df[['date', 'rueda', 'instrumento', 'currency_out', 'currency_in', 'settle', 'settle_date', 'monto', 'cotizacion', 'hora']]
 
@@ -68,7 +67,6 @@ def save_to_database(df):
         result = conn.execute(last_date_query).scalar()
         
         if result:
-            print(f"Ultima fecha: {pd.to_datetime(result)}")
             last_date = pd.to_datetime(result)
             df = df[df['date'] > last_date]
         
@@ -79,8 +77,14 @@ def save_to_database(df):
             print(f"Inserted {len(df)} rows into forex2 table.")
 
 if __name__ == "__main__":
+    print("---------------------------------------------")
+    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Iniciando maeScraper a las: {currentTime}")
     forex_data = fetch_forex_data()
     if forex_data is not None:
         save_to_database(forex_data)
     else:
         print("Data fetching failed.")
+    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Proceso finalizado a las: {currentTime}")
+    print("---------------------------------------------")
