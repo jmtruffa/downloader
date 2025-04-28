@@ -168,7 +168,7 @@ def depositos(file_path = None):
 
         file_path = download()
 
-    data_df = pd.read_excel(file_path, sheet_name="DEPOSITOS", usecols="A:AD", skiprows=9, header=None)
+    data_df = pd.read_excel(file_path, sheet_name="DEPOSITOS", usecols="A:AE", skiprows=9, header=None)
 
     columns_to_drop = [21, 24, 27]
     data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
@@ -200,6 +200,7 @@ def depositos(file_path = None):
       "depositosDolaresExprDolaresTotal",
       "depositosDolaresExprDolaresSPrivado",
       "M2",
+      "M2_transac_privado",
       "tipoSerie"
     )
 
