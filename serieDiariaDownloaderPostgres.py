@@ -141,6 +141,10 @@ if __name__ == "__main__":
 
     file_path = download(year)
 
+    if not file_path:
+        print("No se pudo descargar el archivo. Saliendo sin actualizar la base.")
+    sys.exit(1)
+
     parseSerieDiaria(file_path = file_path, year = year)
 
     print("Base de datos actualizada.")
