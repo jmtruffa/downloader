@@ -120,45 +120,48 @@ if __name__ == "__main__":
                "Total_sectores", 
                "Sector_público",
                "Sector_privado",
-               "UVAs",
-               "DM20_total_sectores",
-               "DM20_sector_publico",
-               "DM20_sector_privado"],
+               "UVAs"
+            #    "DM20_total_sectores",
+            #    "DM20_sector_publico",
+            #    "DM20_sector_privado"
+             ],
     "aSkipRows": [25,
                   25,
                   25,
                   25,
-                  25,
-                  25,
-                  25,
-                  25],
+                  25
+                #   25,
+                #   25,
+                #   25
+                 ],
     "aUseCols": [
         "A:EN",
         "EP:EV",
         "A:EN",
         "A:EN",
-        "A:L",
-        "A:AI",
-        "A:AI",
-        "A:AI"
+        "A:L"
+        # "A:AI",
+        # "A:AI",
+        # "A:AI"
         ],
     "aTableName": ["depTotalSectores",
                    "depTotalSectoresEntidadesNoInformantes",
                     "depSecPublico",
                    "depSecPrivado",
-                    "depUVA",
-                    "depDM20TotalSectores",
-                    "depDM20SectorPublico",
-                    "depDM20SectorPrivado"],
+                    "depUVA"
+                    # "depDM20TotalSectores",
+                    # "depDM20SectorPublico",
+                    # "depDM20SectorPrivado"
+                    ],
     "aColumnsToDrop": [
         [1, 2, 142],
         [],
         [1,2, 142],
         [1,2, 142],
-        [1,2],
-        [1,2,33],
-        [1,2,33],
-        [1,2,33]
+        [1,2]
+        # [1,2,33],
+        # [1,2,33],
+        # [1,2,33]
     ]
     }
 
