@@ -6,6 +6,7 @@ emails.csv
 emailsPostgres.csv
 tempEnvVars.sh
 /venv
+.venv
 .DS_Store
 launch.json
 

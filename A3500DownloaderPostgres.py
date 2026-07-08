@@ -62,7 +62,11 @@ def downloadA3500():
         last_date = pd.to_datetime(last_date)
         
         data_to_insert = data_df[data_df['date'] > last_date]
-    
+
+    # The BCRA source xls sometimes repeats a date row, and A3500.date is UNIQUE,
+    # so a duplicate would abort the whole append.
+    data_to_insert = data_to_insert.drop_duplicates(subset='date', keep='last')
+
     if len(data_to_insert) == 0:
         print("No rows to be inserted. Exiting...")
     else:
