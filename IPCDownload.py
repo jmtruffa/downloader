@@ -82,7 +82,13 @@ def parseIPC(file_path, aCurrentTime):
 
 
     # date column without time
-    data_df["date"] = pd.to_datetime(data_df["date"]).dt.date
+    # INDEC a veces publica la fecha con un día distinto al primero del mes
+    # (ej: 2026-03-26 en lugar de 2026-03-01) y no lo corrigen de su lado.
+    # El IPC es una serie mensual, así que normalizamos toda fecha al primer
+    # día de su mes: arregla ese typo y cualquiera futuro de la misma clase.
+    data_df["date"] = (
+        pd.to_datetime(data_df["date"]).dt.to_period("M").dt.to_timestamp().dt.date
+    )
 
     # convert all columns except date to numeric
     for column in data_df.columns[1:]:
@@ -137,18 +143,24 @@ def main():
     # bajamos el ipc. Me devuelve el path del archivo
     file_path = downloadIPC(currentTime)
 
-    # parseamos el ipc
-    if file_path:
-        currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        df = parseIPC(file_path, currentTime)
+    # si la descarga falló, downloadIPC devuelve False: salimos limpio
+    # sin intentar parsear ni borrar un path inexistente
+    if not file_path:
+        print("No se pudo descargar el IPC. Se aborta la ejecución.")
+        return False
 
+    # parseamos el ipc
+    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df = parseIPC(file_path, currentTime)
+
+    # borramos el archivo temporal una vez parseado
     os.remove(file_path)
-    
+
     # grabamos el ipc en la base de datos
     if df is not None:
         currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         saveIPC(df, currentTime)
-    
+
     return True
 
 if __name__ == "__main__":
