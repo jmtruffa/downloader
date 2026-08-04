@@ -71,7 +71,11 @@ def replaceTable(df, tableName):
 # dejando a los lectores sin tabla mientras corría) y a la función varAgregados()
 # en pandas, que traía la serie entera para dividir columnas y perdía el 30% de
 # las fechas. El orden importa: prestamos_pm_real va antes de la desest, que la lee.
-MATVIEWS = ('agregadosPrivados', 'agregadosPrivadosPM', 'prestamos_pm_real')
+#   agregados_pm_real   -> agregadosReal.sql       (nominal + real, PM)
+# EL ORDEN IMPORTA: agregados_pm_real depende de agregadosPrivadosPM, así que va
+# después. Se refrescan en el orden de esta tupla.
+MATVIEWS = ('agregadosPrivados', 'agregadosPrivadosPM', 'agregados_pm_real',
+            'prestamos_pm_real')
 
 # Series a desestacionalizar con Census X-13, y sus parámetros. Mismo vocabulario
 # que el cuadro series_desest.toml del monorepo de ETLs, para que la calibración
@@ -87,14 +91,21 @@ MATVIEWS = ('agregadosPrivados', 'agregadosPrivadosPM', 'prestamos_pm_real')
 # un stock (promedio mensual de saldos diarios), no un flujo que dependa de la
 # cantidad de días hábiles del mes. Si alguna serie no convence, el camino es
 # calibrarla como se hizo allá y ajustar acá.
-DESEST_JOBS = (
-    {'serie': 'pesosReal',   'sourceView': 'public.prestamos_pm_series',
-     'table': 'public.prestamos_desest', 'mode': 'mult', 'td': 'none',
-     'seasonalma': 's3x5', 'origenCol': 'origen'},
-    {'serie': 'dolaresReal', 'sourceView': 'public.prestamos_pm_series',
-     'table': 'public.prestamos_desest', 'mode': 'mult', 'td': 'none',
-     'seasonalma': 's3x5', 'origenCol': 'origen'},
-)
+# Un dict por dataset: cada uno reporta su propio bloque, como en el monorepo.
+_X13 = {'mode': 'mult', 'td': 'none', 'seasonalma': 's3x5', 'origenCol': 'origen'}
+
+DESEST_JOBS = {
+    'prestamos': tuple(
+        {'serie': s, 'sourceView': 'public.prestamos_pm_series',
+         'table': 'public.prestamos_desest', **_X13}
+        for s in ('pesosReal', 'dolaresReal')
+    ),
+    'agregados': tuple(
+        {'serie': s, 'sourceView': 'public.agregados_pm_series',
+         'table': 'public.agregados_desest', **_X13}
+        for s in ('bmReal', 'circulanteReal', 'm1Real', 'm2Real', 'm3Real')
+    ),
+}
 
 def refreshMatview(matviewName):
     """Refresca un matview con REFRESH MATERIALIZED VIEW CONCURRENTLY.
@@ -474,9 +485,10 @@ if __name__ == "__main__":
     for matview in MATVIEWS:
         refreshMatview(matview)
 
-    # Y la desestacionalización va última: lee prestamos_pm_real, que se acaba de
-    # refrescar. X-13 nunca tumba el ETL; si falla, lo reporta y sigue.
-    seasonalDesest.runDesest(engine, "prestamos", DESEST_JOBS)
+    # Y la desestacionalización va última: lee las matviews *_pm_real que se acaban
+    # de refrescar. X-13 nunca tumba el ETL; si falla, lo reporta y sigue.
+    for dataset, jobs in DESEST_JOBS.items():
+        seasonalDesest.runDesest(engine, dataset, jobs)
 
     os.remove(file_path)
     #db.disconnect()
