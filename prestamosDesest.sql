@@ -63,7 +63,24 @@ ORDER BY serie, date, ingested_at DESC;
 -- ---------------------------------------------------------------------
 -- 3. La vista para consumir: nominal, real y real desestacionalizado
 -- ---------------------------------------------------------------------
+-- pm_hasta / pm_definitivo: hasta qué día del mes está calculado el promedio
+-- mensual que publica el BCRA. Verificado: el PM es el promedio de DÍAS CORRIDOS
+-- desde el 1 hasta el último día presente en la serie diaria, arrastrando el
+-- último saldo en fines de semana y feriados. Para marzo a junio de 2026 el
+-- cálculo reproduce el PM publicado con 0,00000% de diferencia.
+--
+-- Va POR FILA y no como un valor global: para un mes cerrado el corte es su
+-- propio último día y el PM es definitivo; sólo el último mes puede estar
+-- incompleto. Poner el corte global en todas las filas diría que marzo es
+-- provisorio, que es falso.
+--
+-- Importa porque el último punto de las series reales y desestacionalizadas se
+-- mueve por DOS motivos independientes: la inflación proyectada (ipc_origen /
+-- uscpi_origen) y el PM provisorio (esto). Hoy julio-2026 tiene los dos.
 CREATE OR REPLACE VIEW public.prestamos_pm_completo AS
+WITH corte AS (
+    SELECT max(date) AS hasta FROM public.prestamos WHERE "tipoSerie" = 'D'
+)
 SELECT
     r.date,
     r.pesos_nominal,
@@ -75,12 +92,17 @@ SELECT
     r.ipc,
     r.ipc_origen,
     r.uscpi,
-    r.uscpi_origen
+    r.uscpi_origen,
+    least((date_trunc('month', r.date) + interval '1 month -1 day')::date,
+          c.hasta)                                                   AS pm_hasta,
+    ((date_trunc('month', r.date) + interval '1 month -1 day')::date
+        <= c.hasta)                                                  AS pm_definitivo
 FROM public.prestamos_pm_real r
 LEFT JOIN public.prestamos_desest_actual dp
        ON dp.date = r.date AND dp.serie = 'pesosReal'
 LEFT JOIN public.prestamos_desest_actual dd
-       ON dd.date = r.date AND dd.serie = 'dolaresReal';
+       ON dd.date = r.date AND dd.serie = 'dolaresReal'
+CROSS JOIN corte c;
 
 COMMENT ON VIEW public.prestamos_pm_completo IS
 'Vista de consumo de prestamos al sector privado, promedio mensual: nominal, real y real desestacionalizado, en pesos y en dolares. LEFT JOIN a proposito: si X-13 todavia no corrio, o salteo una serie, las columnas *_desest vienen en NULL y el resto sigue sirviendo. Termina un mes antes que public.prestamos porque los deflactores van a mes vencido.';

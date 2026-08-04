@@ -58,7 +58,26 @@ ORDER BY serie, date, ingested_at DESC;
 -- ---------------------------------------------------------------------
 -- 3. La vista para consumir: nominal, real y real desestacionalizado
 -- ---------------------------------------------------------------------
+-- pm_hasta / pm_definitivo: hasta qué día del mes está calculado el promedio
+-- mensual que publica el BCRA. Verificado: el PM es el promedio de DÍAS CORRIDOS
+-- desde el 1 hasta el último día presente en la serie diaria, arrastrando el
+-- último saldo. Para marzo a junio de 2026 el promedio del agregado diario
+-- reproduce el PM publicado con 0,00000% de diferencia.
+--
+-- LEAST entre depositos y bmBCRA: agregadosPrivadosPM combina las dos hojas, así
+-- que el mes es tan provisorio como el más atrasado de sus insumos. Hoy están
+-- parejas, pero son hojas distintas del mismo xlsm y nada garantiza que sigan
+-- sincronizadas; si una se atrasa, sin el LEAST no se notaría.
+--
+-- Va POR FILA: para un mes cerrado el corte es su propio último día y el PM es
+-- definitivo; sólo el último mes puede estar incompleto.
 CREATE OR REPLACE VIEW public.agregados_pm_completo AS
+WITH corte AS (
+    SELECT least(
+        (SELECT max(date) FROM public.depositos WHERE "tipoSerie" = 'D'),
+        (SELECT max(date) FROM public."bmBCRA"  WHERE "tipoSerie" = 'D')
+    ) AS hasta
+)
 SELECT
     r.date,
     r.bm_nominal,         r.bm_real,         dbm.valor  AS bm_real_desest,
@@ -67,13 +86,18 @@ SELECT
     r.m2_nominal,         r.m2_real,         d2.valor   AS m2_real_desest,
     r.m3_nominal,         r.m3_real,         d3.valor   AS m3_real_desest,
     r.ipc,
-    r.ipc_origen
+    r.ipc_origen,
+    least((date_trunc('month', r.date) + interval '1 month -1 day')::date,
+          c.hasta)                                                   AS pm_hasta,
+    ((date_trunc('month', r.date) + interval '1 month -1 day')::date
+        <= c.hasta)                                                  AS pm_definitivo
 FROM public.agregados_pm_real r
 LEFT JOIN public.agregados_desest_actual dbm ON dbm.date = r.date AND dbm.serie = 'bmReal'
 LEFT JOIN public.agregados_desest_actual dc  ON dc.date  = r.date AND dc.serie  = 'circulanteReal'
 LEFT JOIN public.agregados_desest_actual d1  ON d1.date  = r.date AND d1.serie  = 'm1Real'
 LEFT JOIN public.agregados_desest_actual d2  ON d2.date  = r.date AND d2.serie  = 'm2Real'
-LEFT JOIN public.agregados_desest_actual d3  ON d3.date  = r.date AND d3.serie  = 'm3Real';
+LEFT JOIN public.agregados_desest_actual d3  ON d3.date  = r.date AND d3.serie  = 'm3Real'
+CROSS JOIN corte c;
 
 COMMENT ON VIEW public.agregados_pm_completo IS
 'Vista de consumo de los agregados monetarios privados, promedio mensual: nominal, real y real desestacionalizado, para BM, Circulante, M1, M2 y M3. LEFT JOIN a proposito: si X-13 todavia no corrio, o salteo una serie, las columnas *_desest vienen en NULL y el resto sigue sirviendo. ipc_origen dice si el deflactor del mes es publicado o proyectado.';
