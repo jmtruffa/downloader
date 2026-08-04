@@ -9,4 +9,6 @@ tempEnvVars.sh
 .venv
 .DS_Store
 launch.json
+# Registro de skills de la herramienta de IA: metadata regenerable, no del ETL.
+.atl/
 
