@@ -108,6 +108,35 @@ def parseIPC(file_path, aCurrentTime):
 
     return data_df
 
+def refreshIPCLargo(db):
+    """Refresca el matview public.ipc_largo (IPC empalmado base dic-2016 = 100).
+
+    Corre después del INSERT y en su propia conexión en AUTOCOMMIT porque
+    REFRESH MATERIALIZED VIEW CONCURRENTLY no puede ejecutarse dentro de una
+    transacción. Si el matview todavía no existe se avisa y se sigue: el ETL
+    del IPC no depende de él. Cualquier otro error se propaga a propósito, para
+    que la corrida termine con exit code != 0 y el MAILTO del cron avise.
+    """
+    conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    try:
+        exists = conn.execute(sqlalchemy.text(
+            "SELECT 1 FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'public' AND c.relname = 'ipc_largo' AND c.relkind = 'm'"
+        )).scalar()
+
+        if not exists:
+            print("El matview public.ipc_largo no existe: se omite el refresh.")
+            return
+
+        print("Refrescando public.ipc_largo...")
+        conn.execute(sqlalchemy.text(
+            "REFRESH MATERIALIZED VIEW CONCURRENTLY public.ipc_largo"
+        ))
+        print("public.ipc_largo refrescado OK.")
+    finally:
+        conn.close()
+
 def saveIPC(df, aCurrentTime):
     """Insert the data into the database"""
 
@@ -124,11 +153,30 @@ def saveIPC(df, aCurrentTime):
         print(f"Insertando {len(df)} filas en la tabla IPC")
         # use Date type for the 'date' column in the database to get rid of the time part
         dtypeMap = {'date': sqlalchemy.types.Date}
-        result = df.to_sql(name = 'IPCIndec', con = db.engine, if_exists = 'replace', index = False, dtype=dtypeMap, schema = 'public')
-        #db.conn.commit()
-        print(f"Number of records inserted as reported by the postgres server: {result}") 
 
-    
+        # No se usa if_exists='replace': eso emite un DROP TABLE sin CASCADE y
+        # Postgres lo rechaza cuando hay objetos dependientes, como la vista
+        # public.v_ipc_largo que alimenta el matview public.ipc_largo.
+        # TRUNCATE + append es transaccional en Postgres: preserva el esquema de
+        # la tabla, no rompe las dependencias y ningún lector ve la tabla vacía.
+        tableExists = sqlalchemy.inspect(db.engine).has_table('IPCIndec', schema='public')
+
+        with db.engine.begin() as conn:
+            if tableExists:
+                conn.execute(sqlalchemy.text('TRUNCATE TABLE public."IPCIndec"'))
+            result = df.to_sql(
+                name='IPCIndec',
+                con=conn,
+                if_exists='append' if tableExists else 'replace',
+                index=False,
+                dtype=dtypeMap,
+                schema='public',
+            )
+        print(f"Number of records inserted as reported by the postgres server: {result}")
+
+        # El IPC empalmado se recalcula recién acá, con los datos ya commiteados.
+        refreshIPCLargo(db)
+
     db.disconnect()
 
     print(f"IPC grabado OK a las {aCurrentTime} ")
