@@ -68,7 +68,7 @@ CREATE INDEX IF NOT EXISTS inflacion_proyectada_lookup_idx
     ON public.inflacion_proyectada (deflactor, fecha, ingested_at DESC);
 
 COMMENT ON TABLE public.inflacion_proyectada IS
-'Proyecciones de inflacion mensual para deflactar meses todavia no publicados. Se guarda la VARIACION mensual (var_mens, tanto por uno) y no el nivel del indice: el nivel se deriva encadenando sobre el ultimo mes publicado de la serie que indica `deflactor`, asi se reancla solo cuando INDEC o el BLS publican. APPEND-ONLY: para corregir una proyeccion se inserta una fila nueva, nunca se updatea; la vista inflacion_proyectada_actual se queda con la mas reciente por (deflactor, mes). `usuario` es obligatorio y sin default: todas las conexiones usan el rol postgres, asi que un default current_user pondria postgres en todo y no serviria de nada; pasarlo desde la shell con psql -v yo="$USER" y :''yo''. El empalme publicado + proyectado vive en la vista public.deflactores; ipc_largo y uscpi_mensual siguen conteniendo solo datos publicados.';
+'Proyecciones de inflacion mensual para deflactar meses todavia no publicados. Se guarda la VARIACION mensual (var_mens, tanto por uno) y no el nivel del indice: el nivel se deriva encadenando sobre el ultimo mes publicado de la serie que indica `deflactor`, asi se reancla solo cuando INDEC o el BLS publican. APPEND-ONLY: para corregir una proyeccion se inserta una fila nueva, nunca se updatea; la vista inflacion_proyectada_actual se queda con la mas reciente por (deflactor, mes). `usuario` es obligatorio y sin default: todas las conexiones usan el rol postgres, asi que un default current_user pondria postgres en todo y no serviria de nada; pasarlo desde la shell con psql -v yo="$(id -un)" y :''yo'' ($(id -un) y no $USER, que es una variable de entorno y se puede exportar a cualquier valor). El empalme publicado + proyectado vive en la vista public.deflactores; ipc_largo y uscpi_mensual siguen conteniendo solo datos publicados.';
 
 
 -- ---------------------------------------------------------------------
@@ -192,9 +192,13 @@ ORDER BY p.deflactor, p.fecha;
 -- =====================================================================
 -- `usuario` es obligatorio. La forma de no tipearlo a mano cada vez es pasarle el
 -- usuario del sistema operativo desde la shell, que es el unico que sabe quien
--- sos, y usarlo como variable de psql:
+-- sos, y usarlo como variable de psql.
 --
---   psql -h 10.0.16.3 -U postgres -d data -v yo="$USER" <<'SQL'
+-- Se usa $(id -un) y NO $USER: $USER es una variable de entorno y alcanza un
+-- `export USER=otro` para que la shell mande cualquier cosa. `id -un` lee el UID
+-- real del proceso, asi que devuelve el usuario verdadero siempre. Comprobado.
+--
+--   psql -h 10.0.16.3 -U postgres -d data -v yo="$(id -un)" <<'SQL'
 --   insert into public.inflacion_proyectada (deflactor, fecha, var_mens, fuente, usuario)
 --   values ('ipc_largo',     '2026-07-01', 0.019, 'REM BCRA 2026-07', :'yo'),
 --          ('uscpi_mensual', '2026-07-01', 0.002, 'proyeccion propia', :'yo');
