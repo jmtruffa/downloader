@@ -15,38 +15,83 @@ db_port = os.environ.get('POSTGRES_PORT', '5432')  # Default port for PostgreSQL
 db_name = os.environ.get('POSTGRES_DB')
 dtypeMap = {'date': sqlalchemy.types.Date}
 
-def varAgregados():
-    
-    ag = pd.read_sql_query('SELECT * FROM "agregadosPrivados"', con=engine)
+def replaceTable(df, tableName):
+    """Reemplaza el contenido de una tabla sin destruirla.
 
-    
+    No se usa to_sql(if_exists='replace'): eso emite un DROP TABLE sin CASCADE
+    y Postgres lo rechaza cuando la tabla tiene objetos dependientes (una vista
+    o un matview colgado de ella). TRUNCATE + append es transaccional en
+    Postgres: preserva el esquema de la tabla, no rompe esas dependencias y
+    ningún lector ve la tabla vacía a mitad de camino.
 
-    ag['date'] = ag['date'].astype('datetime64[ns]')
-        
-    ag['anioMenos'] = ag['date'] - pd.DateOffset(years=1)
+    Si la tabla todavía no existe se cae a 'replace', que en ese caso la crea.
 
-    # cast anioMenos to datetime
-    ag['anioMenos'] = ag['anioMenos'].astype('datetime64[ns]')
+    Contracara de no usar 'replace': el append no puede cambiar el esquema. Si
+    la planilla del BCRA gana o pierde una columna, esto corta con un mensaje
+    explícito en vez de un error opaco de psycopg, y hay que migrar la tabla a
+    mano antes de volver a correr.
+    """
+    inspector = sqlalchemy.inspect(engine)
+    tableExists = inspector.has_table(tableName, schema='public')
 
-    # merge df with itself on date and anioMenos
+    if tableExists:
+        enTabla = {c['name'] for c in inspector.get_columns(tableName, schema='public')}
+        if enTabla != set(df.columns):
+            raise RuntimeError(
+                f'public."{tableName}": las columnas no coinciden con las de la tabla. '
+                f'Sobran en el origen: {sorted(set(df.columns) - enTabla)}. '
+                f'Faltan en el origen: {sorted(enTabla - set(df.columns))}. '
+                'TRUNCATE + append no cambia el esquema: migrar la tabla '
+                '(DROP si no tiene dependencias, o ALTER TABLE) y volver a correr.'
+            )
 
-    ag = ag.merge(ag, left_on='anioMenos', right_on='date', suffixes=('', '_anioMenos'))
-    ag.drop(columns=['anioMenos', 'date_anioMenos', 'anioMenos_anioMenos'], inplace=True)
-    # divide columns 1:4 by columns 5:8
-    for column in ag.columns[1:5]:
-        ag[column] = ag[column] / ag[column + '_anioMenos'] - 1
-    
-    # drop columns 5:8
-    ag.drop(columns=ag.columns[5:9], inplace=True)
+    with engine.begin() as con:
+        if tableExists:
+            con.execute(text(f'TRUNCATE TABLE public."{tableName}"'))
+        df.to_sql(
+            name=tableName,
+            con=con,
+            if_exists='append' if tableExists else 'replace',
+            index=False,
+            schema='public',
+            dtype=dtypeMap,
+        )
 
-    dtypeMap = {'date': sqlalchemy.types.Date}
+def refreshAgregadosPrivados():
+    """Refresca el matview public."agregadosPrivados" (agregados monetarios del
+    sector privado, serie diaria, con sus variaciones anuales).
 
-    ag.to_sql(name='varAgregados', con=engine, if_exists='replace', index=False, schema='public', dtype=dtypeMap)
-    # commit
-    #db.conn.commit()
+    Va al final del ETL, cuando depositos y bmBCRA ya están cargados y
+    commiteados, y en conexión propia en AUTOCOMMIT porque REFRESH MATERIALIZED
+    VIEW CONCURRENTLY no puede ejecutarse dentro de una transacción.
 
-    return ag
+    Reemplaza al procedure agregadosprivados() (que dropeaba y recreaba la
+    tabla, llevándose los índices y dejando a los lectores sin tabla mientras
+    corría) y a la función varAgregados() en pandas, que traía la serie entera
+    para dividir columnas y perdía el 30% de las fechas. La definición vive en
+    agregadosPrivados.sql. Si el matview no existe se avisa y se sigue;
+    cualquier otro error se propaga para que el MAILTO del cron avise.
+    """
+    conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    try:
+        exists = conn.execute(text(
+            "SELECT 1 FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'public' AND c.relname = 'agregadosPrivados' "
+            "AND c.relkind = 'm'"
+        )).scalar()
 
+        if not exists:
+            print('El matview public."agregadosPrivados" no existe: se omite el refresh.')
+            return
+
+        print('Refrescando public."agregadosPrivados"...')
+        conn.execute(text(
+            'REFRESH MATERIALIZED VIEW CONCURRENTLY public."agregadosPrivados"'
+        ))
+        print('public."agregadosPrivados" refrescado OK.')
+    finally:
+        conn.close()
 
 def download():
     url = "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/series.xlsm"
@@ -118,7 +163,7 @@ def bm(file_path = None):
     
     data_df.columns = column_definitions
     
-    data_df.to_sql('bmBCRA', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    replaceTable(data_df, 'bmBCRA')
 
 
     if file_path == None:
@@ -153,7 +198,7 @@ def reservas(file_path = None):
     
     data_df.columns = column_definitions
 
-    data_df.to_sql('reservas', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    replaceTable(data_df, 'reservas')
     
 
     # Delete the temporary file if it was not passed as an argument
@@ -206,16 +251,11 @@ def depositos(file_path = None):
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('depositos', engine, if_exists='replace', index=False, dtype=dtypeMap)
-    with engine.connect() as con:
-        con.execute(text("CALL agregadosprivados();"))
-    #engine.connect.execute("CALL agregadosprivados();") ##db.execute_query("SELECT agregadosprivados();")##
+    replaceTable(data_df, 'depositos')
 
-    # acá vamos a calcular las variaciones anuales de los agregados privados
-    df_varAg = varAgregados()
+    # Los agregados privados salen del matview "agregadosPrivados", que se
+    # refresca al final de main() — no acá, porque también depende de bmBCRA.
 
-    df_varAg.to_sql('varAnualAgregadosPrivados', engine, if_exists='replace', index=False, dtype=dtypeMap)
-    
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
         os.remove(file_path)
@@ -258,7 +298,7 @@ def prestamos(file_path = None):
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('prestamos', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    replaceTable(data_df, 'prestamos')
 
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -301,7 +341,7 @@ def tasas(file_path = None):
 
     data_df.columns = column_definitions
 
-    data_df.to_sql('tasas', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    replaceTable(data_df, 'tasas')
 
     # Delete the temporary file if it was not passed as an argument
     if file_path == None:
@@ -371,7 +411,7 @@ def instrumentos(file_path = None):
     # drop columna "vacio"
     data_df = data_df.drop(columns=["vacio"])
 
-    data_df.to_sql('instrumentos', engine, if_exists='replace', index=False, dtype=dtypeMap)
+    replaceTable(data_df, 'instrumentos')
     
 
     # Delete the temporary file if it was not passed as an argument
@@ -396,6 +436,11 @@ if __name__ == "__main__":
             print(f"{func.__name__} parsed successfully at {current_time}")
         else:
             print(f"An error occurred while downloading {func.__name__}")
+
+    # Recién acá: el matview depende de depositos y de bmBCRA, así que se
+    # refresca cuando las dos están cargadas, sin depender del orden de la lista.
+    refreshAgregadosPrivados()
+
     os.remove(file_path)
     #db.disconnect()
     print("Temporary file deleted.")
