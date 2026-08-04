@@ -73,8 +73,9 @@ SELECT
     r.dolares_real,
     dd.valor                AS dolares_real_desest,
     r.ipc,
+    r.ipc_origen,
     r.uscpi,
-    r.uscpi_interpolado
+    r.uscpi_origen
 FROM public.prestamos_pm_real r
 LEFT JOIN public.prestamos_desest_actual dp
        ON dp.date = r.date AND dp.serie = 'pesosReal'

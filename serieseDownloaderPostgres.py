@@ -63,11 +63,14 @@ def replaceTable(df, tableName):
 # definiciones viven en el repo, un archivo .sql por objeto.
 #   agregadosPrivados   -> agregadosPrivados.sql   (serie diaria, tipoSerie = D)
 #   agregadosPrivadosPM -> agregadosPrivadosPM.sql (promedio mensual, PM)
-# Ambas derivan de depositos y bmBCRA, así que se refrescan cuando las dos
-# tablas ya están cargadas. Reemplazan al procedure agregadosprivados() (que
-# dropeaba y recreaba la tabla, llevándose los índices y dejando a los lectores
-# sin tabla mientras corría) y a la función varAgregados() en pandas, que traía
-# la serie entera para dividir columnas y perdía el 30% de las fechas.
+#   prestamos_pm_real   -> prestamosReal.sql       (nominal + real, PM)
+# Las dos de agregados derivan de depositos y bmBCRA, y prestamos_pm_real de
+# prestamos y de los deflactores, así que todas se refrescan cuando las tablas
+# base ya están cargadas. Las de agregados reemplazan al procedure
+# agregadosprivados() (que dropeaba y recreaba la tabla, llevándose los índices y
+# dejando a los lectores sin tabla mientras corría) y a la función varAgregados()
+# en pandas, que traía la serie entera para dividir columnas y perdía el 30% de
+# las fechas. El orden importa: prestamos_pm_real va antes de la desest, que la lee.
 MATVIEWS = ('agregadosPrivados', 'agregadosPrivadosPM', 'prestamos_pm_real')
 
 # Series a desestacionalizar con Census X-13, y sus parámetros. Mismo vocabulario
@@ -87,10 +90,10 @@ MATVIEWS = ('agregadosPrivados', 'agregadosPrivadosPM', 'prestamos_pm_real')
 DESEST_JOBS = (
     {'serie': 'pesosReal',   'sourceView': 'public.prestamos_pm_series',
      'table': 'public.prestamos_desest', 'mode': 'mult', 'td': 'none',
-     'seasonalma': 's3x5'},
+     'seasonalma': 's3x5', 'origenCol': 'origen'},
     {'serie': 'dolaresReal', 'sourceView': 'public.prestamos_pm_series',
      'table': 'public.prestamos_desest', 'mode': 'mult', 'td': 'none',
-     'seasonalma': 's3x5'},
+     'seasonalma': 's3x5', 'origenCol': 'origen'},
 )
 
 def refreshMatview(matviewName):

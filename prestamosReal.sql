@@ -8,27 +8,34 @@
 -- FUENTE: public.prestamos con tipoSerie = 'PM' (promedio mensual), 283 meses
 -- desde 2003-01, fecha al primer día del mes, sin huecos.
 --
--- DEFLACTORES, uno por moneda:
---   * pesos   -> public.ipc_largo (IPC empalmado base dic-2016 = 100). NO se usa
---     "IPCIndec" directo: arranca en dic-2016 y dejaría la serie en 115 meses
+-- DEFLACTORES: los dos salen de public.deflactores, que empalma lo publicado con
+-- las proyecciones de public.inflacion_proyectada:
+--   * pesos   -> deflactor 'ipc_largo' (IPC empalmado base dic-2016 = 100). NO se
+--     usa "IPCIndec" directo: arranca en dic-2016 y dejaría la serie en 115 meses
 --     contra 282. De dic-2016 en adelante ipc_largo ES IPCIndec exacto, así que
 --     no se pierde nada; hacia atrás arrastra el redondeo de inflaempalmada
---     (~0,2% por 2002), que está documentado en el COMMENT de ipc_largo.
---   * dólares -> public.uscpi_mensual (CPI-U del BLS, NSA, con oct-2025
---     interpolado y marcado). Deflactar dólares con el IPC argentino no
---     significa nada: son dos monedas y dos inflaciones distintas.
+--     (~0,2% por 2002), documentado en el COMMENT de ipc_largo.
+--   * dólares -> deflactor 'uscpi_mensual' (CPI-U del BLS, NSA). Deflactar
+--     dólares con el IPC argentino no significa nada: son dos monedas y dos
+--     inflaciones distintas.
 --
--- BASE: último mes disponible de CADA deflactor, calculada dinámicamente, igual
--- que el ejemplo de uso de ipc_largo.sql. O sea, pesos y dólares de <último mes>.
+-- La procedencia de cada deflactor viaja en ipc_origen y uscpi_origen:
+-- 'publicado', 'interpolado' (mes que el BLS no publicó) o 'proyectado' (de
+-- inflacion_proyectada). SIEMPRE mirarlas antes de presentar un valor como firme.
+--
+-- BASE: último mes PUBLICADO de cada deflactor, calculada dinámicamente. Publicado
+-- y no proyectado a propósito: si la base fuera un mes proyectado, corregir la
+-- proyección movería TODA la serie real. Así sólo se mueven los meses cuyo propio
+-- deflactor es proyectado.
 -- CONSECUENCIA A TENER PRESENTE: cuando entra un mes nuevo de IPC o de CPI, la
 -- serie real entera se reescala. Los niveles cambian, las variaciones no. X-13
 -- es invariante a escala, así que los factores estacionales tampoco cambian.
 --
--- EL ÚLTIMO MES QUEDA AFUERA. Préstamos llega a 2026-07 y los dos deflactores a
--- 2026-06, así que la serie real corta un mes antes que la nominal. Es inevitable
--- (el IPC se publica a mes vencido) y por eso el JOIN es INNER: una fila con
--- deflactor nulo sería una fila con valor real nulo, y X-13 rechaza la serie
--- entera si tiene huecos.
+-- HASTA DÓNDE LLEGA: hasta el último mes que tenga deflactor, publicado o
+-- proyectado. Sin proyecciones cargadas corta en 2026-06 y deja afuera el
+-- 2026-07 que sí tiene préstamos. Con la proyección de julio cargada, llega a
+-- julio. El JOIN es INNER a propósito: una fila con deflactor nulo sería un valor
+-- real nulo, y X-13 rechaza la serie entera si tiene huecos.
 --
 -- ESCALAS de public.prestamos, que no son homogéneas:
 --   prestamosSPPesosTotal            millones de pesos
@@ -49,10 +56,14 @@ DROP MATERIALIZED VIEW IF EXISTS public.prestamos_pm_real CASCADE;
 
 CREATE MATERIALIZED VIEW public.prestamos_pm_real AS
 WITH base_pesos AS (
-    SELECT indice AS base FROM public.ipc_largo ORDER BY fecha DESC LIMIT 1
+    SELECT indice AS base FROM public.deflactores
+    WHERE deflactor = 'ipc_largo' AND origen <> 'proyectado'
+    ORDER BY fecha DESC LIMIT 1
 ),
 base_dolares AS (
-    SELECT indice AS base FROM public.uscpi_mensual ORDER BY fecha DESC LIMIT 1
+    SELECT indice AS base FROM public.deflactores
+    WHERE deflactor = 'uscpi_mensual' AND origen <> 'proyectado'
+    ORDER BY fecha DESC LIMIT 1
 )
 SELECT
     p.date,
@@ -61,12 +72,12 @@ SELECT
     p."prestamosSPPesosTotal"   * bp.base / l.indice   AS pesos_real,
     p."prestamosSPDolaresTotal" * bd.base / u.indice   AS dolares_real,
     l.indice                                           AS ipc,
+    l.origen                                           AS ipc_origen,
     u.indice                                           AS uscpi,
-    u.interpolado                                      AS uscpi_interpolado,
-    l.fuente                                           AS ipc_fuente
+    u.origen                                           AS uscpi_origen
 FROM public.prestamos p
-JOIN public.ipc_largo     l  ON l.fecha = p.date
-JOIN public.uscpi_mensual u  ON u.fecha = p.date
+JOIN public.deflactores l ON l.fecha = p.date AND l.deflactor = 'ipc_largo'
+JOIN public.deflactores u ON u.fecha = p.date AND u.deflactor = 'uscpi_mensual'
 CROSS JOIN base_pesos   bp
 CROSS JOIN base_dolares bd
 WHERE p."tipoSerie" = 'PM'
@@ -85,10 +96,15 @@ COMMENT ON MATERIALIZED VIEW public.prestamos_pm_real IS
 -- El núcleo de desestacionalización lee exactamente `select date, valor from
 -- <vista> where serie = %s order by date`, así que los nombres de columna
 -- (date, valor, serie) son parte del contrato y no se cambian.
+-- `origen` va por serie: pesos arrastra la procedencia del IPC y dólares la del
+-- CPI. El núcleo sólo lee date y valor, pero usa esta columna, si se le pasa, para
+-- registrar en `parametros` cuántos meses de cada procedencia entraron al ajuste.
 CREATE OR REPLACE VIEW public.prestamos_pm_series AS
-SELECT 'pesosReal'::text   AS serie, date, pesos_real   AS valor FROM public.prestamos_pm_real
+SELECT 'pesosReal'::text   AS serie, date, pesos_real   AS valor, ipc_origen   AS origen
+FROM public.prestamos_pm_real
 UNION ALL
-SELECT 'dolaresReal'::text AS serie, date, dolares_real AS valor FROM public.prestamos_pm_real;
+SELECT 'dolaresReal'::text AS serie, date, dolares_real AS valor, uscpi_origen AS origen
+FROM public.prestamos_pm_real;
 
 COMMENT ON VIEW public.prestamos_pm_series IS
 'prestamos_pm_real en formato long (serie, date, valor), entrada del desestacionalizador X-13. Series: pesosReal y dolaresReal. Los nombres de columna son el contrato que espera el nucleo de desest (select date, valor from <vista> where serie = %s), no cambiarlos.';
@@ -114,12 +130,21 @@ SELECT count(*) FILTER (WHERE pesos_real   <= 0) AS pesos_no_positivos,
        count(*) FILTER (WHERE dolares_real <= 0) AS dolares_no_positivos
 FROM public.prestamos_pm_real;
 
--- 3. En el mes base, real tiene que ser igual a nominal (0 filas = OK).
+-- 3. En el mes base (último publicado), real tiene que ser igual a nominal
+--    (0 filas = OK).
 SELECT r.date, r.pesos_nominal, r.pesos_real, r.dolares_nominal, r.dolares_real
 FROM public.prestamos_pm_real r
-WHERE r.date = (SELECT max(fecha) FROM public.ipc_largo)
+WHERE r.date = (SELECT max(fecha) FROM public.deflactores
+                WHERE deflactor = 'ipc_largo' AND origen <> 'proyectado')
   AND (abs(r.pesos_real   - r.pesos_nominal)   > 1e-6
     OR abs(r.dolares_real - r.dolares_nominal) > 1e-6);
+
+-- 3b. Procedencia de los deflactores usados. Todo lo que no sea 'publicado'
+--     conviene saberlo: 'proyectado' son meses que se van a revisar.
+SELECT ipc_origen, uscpi_origen, count(*) AS meses,
+       min(date) AS desde, max(date) AS hasta
+FROM public.prestamos_pm_real
+GROUP BY 1, 2 ORDER BY 4;
 
 -- 4. El nominal tiene que coincidir con la tabla origen (0 filas = OK).
 SELECT r.date
@@ -134,9 +159,11 @@ SELECT serie, count(*) AS filas, min(date) AS desde, max(date) AS hasta,
 FROM public.prestamos_pm_series
 GROUP BY serie ORDER BY serie;
 
--- 6. Cuántos meses arrastran el CPI interpolado.
-SELECT count(*) AS meses_con_uscpi_interpolado
-FROM public.prestamos_pm_real WHERE uscpi_interpolado;
+-- 6. Cuántos meses no se apoyan en un deflactor publicado.
+SELECT count(*) FILTER (WHERE uscpi_origen = 'interpolado') AS uscpi_interpolado,
+       count(*) FILTER (WHERE ipc_origen   = 'proyectado')  AS ipc_proyectado,
+       count(*) FILTER (WHERE uscpi_origen = 'proyectado')  AS uscpi_proyectado
+FROM public.prestamos_pm_real;
 
 -- 7. Nominal vs real, últimas filas: en pesos el real tiene que crecer mucho
 --    menos que el nominal (la inflación se fue), en dólares casi lo mismo.

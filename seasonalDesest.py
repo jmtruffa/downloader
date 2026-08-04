@@ -163,7 +163,7 @@ def _result(serie, status, *, n=0, mode=None, reason="", outdir=None):
 def deseasonalize(engine, *, serie, sourceView, table,
                   outEstado="desestacionalizado", fuente="census x13",
                   mode="mult", td="none", seasonalma="s3x5", start=None,
-                  keepDir=None):
+                  keepDir=None, origenCol=None):
     """Corre X-13 sobre una serie observada y hace UPSERT de la desestacionalizada.
 
     - `sourceView`  vista con (serie, date, valor); se filtra por `serie`.
@@ -172,6 +172,12 @@ def deseasonalize(engine, *, serie, sourceView, table,
     - `keepDir`     si se pasa, conserva la salida completa de x13as (serie.html
                     con modelo, factores y diagnósticos, más d10/d11/d12/d13 y el
                     .spc) en keepDir/<serie>/ para poder inspeccionarla.
+    - `origenCol`   nombre de una columna opcional de la vista con la procedencia
+                    de cada mes (publicado / interpolado / proyectado). Si se pasa,
+                    el conteo por procedencia queda en `parametros`, que es lo que
+                    después explica por qué un valor ajustado se movió sin que
+                    hubiera datos nuevos: si entraron meses proyectados, el ajuste
+                    se revisa cuando se publica el dato real.
 
     No imprime: devuelve un dict que el caller reporta de forma uniforme.
     """
@@ -179,10 +185,12 @@ def deseasonalize(engine, *, serie, sourceView, table,
     if not x13bin:
         return _result(serie, "skipped", reason="x13as no encontrado (setear X13PATH)")
 
-    # 1. Serie observada desde la vista.
+    # 1. Serie observada desde la vista. date y valor son el contrato; la columna
+    # de procedencia es opcional y va al final para no alterar las posiciones.
+    cols = "date, valor" + (f", {origenCol}" if origenCol else "")
     with engine.connect() as con:
         rows = con.execute(
-            text(f"SELECT date, valor FROM {sourceView} WHERE serie = :serie ORDER BY date"),
+            text(f"SELECT {cols} FROM {sourceView} WHERE serie = :serie ORDER BY date"),
             {"serie": serie},
         ).fetchall()
 
@@ -243,6 +251,15 @@ def deseasonalize(engine, *, serie, sourceView, table,
         "desde": dates[0].isoformat(),
         "hasta": dates[-1].isoformat(),
     }
+    if origenCol:
+        conteo = {}
+        for r in rows:
+            conteo[r[2]] = conteo.get(r[2], 0) + 1
+        params["origen_conteo"] = conteo
+        if conteo.get("proyectado"):
+            params["origen_aviso"] = (
+                f"{conteo['proyectado']} mes(es) apoyados en inflacion proyectada: "
+                "el ajuste se revisa cuando se publique el dato real")
     arima = _arimaModel(workdir, base)
     if arima:
         params["arima"] = arima
