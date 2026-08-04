@@ -46,15 +46,29 @@ CREATE TABLE IF NOT EXISTS public.inflacion_proyectada (
     var_mens    double precision not null
                 check (var_mens > -1),
     fuente      text,                                   -- 'REM BCRA 2026-07', 'estimacion propia', ...
+    -- Quién cargó el valor. NOT NULL y SIN DEFAULT a propósito: todas las
+    -- conexiones a esta base usan el único rol `postgres`, así que un
+    -- `default current_user` pondría 'postgres' en todas las filas y daría una
+    -- falsa sensación de trazabilidad. Postgres no puede ver el usuario del
+    -- sistema operativo; el que lo sabe es la terminal. Obligar a declararlo es
+    -- lo único que hace que el campo sirva. Complementa a `fuente`: fuente dice
+    -- de dónde salió el número, usuario dice quién lo cargó.
+    usuario     text not null check (usuario <> ''),
     nota        text,
     ingested_at timestamptz not null default now()
 );
+
+-- Upgrade para bases que ya tengan la tabla sin esta columna. Si la tabla tuviera
+-- filas, este ALTER falla por el NOT NULL: en ese caso hay que agregarla nullable,
+-- backfillear y después poner el NOT NULL.
+ALTER TABLE public.inflacion_proyectada
+    ADD COLUMN IF NOT EXISTS usuario text not null check (usuario <> '');
 
 CREATE INDEX IF NOT EXISTS inflacion_proyectada_lookup_idx
     ON public.inflacion_proyectada (deflactor, fecha, ingested_at DESC);
 
 COMMENT ON TABLE public.inflacion_proyectada IS
-'Proyecciones de inflacion mensual para deflactar meses todavia no publicados. Se guarda la VARIACION mensual (var_mens, tanto por uno) y no el nivel del indice: el nivel se deriva encadenando sobre el ultimo mes publicado de la serie que indica `deflactor`, asi se reancla solo cuando INDEC o el BLS publican. APPEND-ONLY: para corregir una proyeccion se inserta una fila nueva, nunca se updatea; la vista inflacion_proyectada_actual se queda con la mas reciente por (deflactor, mes). El empalme publicado + proyectado vive en la vista public.deflactores; ipc_largo y uscpi_mensual siguen conteniendo solo datos publicados.';
+'Proyecciones de inflacion mensual para deflactar meses todavia no publicados. Se guarda la VARIACION mensual (var_mens, tanto por uno) y no el nivel del indice: el nivel se deriva encadenando sobre el ultimo mes publicado de la serie que indica `deflactor`, asi se reancla solo cuando INDEC o el BLS publican. APPEND-ONLY: para corregir una proyeccion se inserta una fila nueva, nunca se updatea; la vista inflacion_proyectada_actual se queda con la mas reciente por (deflactor, mes). `usuario` es obligatorio y sin default: todas las conexiones usan el rol postgres, asi que un default current_user pondria postgres en todo y no serviria de nada; pasarlo desde la shell con psql -v yo="$USER" y :''yo''. El empalme publicado + proyectado vive en la vista public.deflactores; ipc_largo y uscpi_mensual siguen conteniendo solo datos publicados.';
 
 
 -- ---------------------------------------------------------------------
@@ -66,9 +80,14 @@ COMMENT ON TABLE public.inflacion_proyectada IS
 -- quedan con el mismo ingested_at y el DISTINCT ON elegiría una arbitrariamente.
 -- `id` es identity y siempre crece, así que gana la última insertada, que es la
 -- definición de "vigente" en una tabla append-only.
+-- `usuario` va AL FINAL, no al lado de `fuente` donde quedaría más prolijo:
+-- CREATE OR REPLACE VIEW sólo permite AGREGAR columnas al final, y meterla en el
+-- medio se interpreta como renombrar una existente. Reordenar obligaría a dropear
+-- la vista, y de ella cuelgan deflactores y, más abajo, la matview
+-- prestamos_pm_real: un CASCADE se llevaría media cadena. No "acomodar" el orden.
 CREATE OR REPLACE VIEW public.inflacion_proyectada_actual AS
 SELECT DISTINCT ON (deflactor, fecha)
-       deflactor, fecha, var_mens, fuente, nota, ingested_at, id
+       deflactor, fecha, var_mens, fuente, nota, ingested_at, id, usuario
 FROM public.inflacion_proyectada
 ORDER BY deflactor, fecha, ingested_at DESC, id DESC;
 
@@ -171,15 +190,27 @@ ORDER BY p.deflactor, p.fecha;
 -- =====================================================================
 -- Cómo cargar una proyección
 -- =====================================================================
--- Un mes:
---   insert into public.inflacion_proyectada (deflactor, fecha, var_mens, fuente)
---   values ('ipc_largo', '2026-07-01', 0.019, 'REM BCRA 2026-07');
+-- `usuario` es obligatorio. La forma de no tipearlo a mano cada vez es pasarle el
+-- usuario del sistema operativo desde la shell, que es el unico que sabe quien
+-- sos, y usarlo como variable de psql:
 --
--- Varios meses de una (tienen que ser contiguos desde el ultimo publicado):
---   insert into public.inflacion_proyectada (deflactor, fecha, var_mens, fuente)
---   values ('ipc_largo', '2026-07-01', 0.019, 'REM BCRA 2026-07'),
---          ('ipc_largo', '2026-08-01', 0.017, 'REM BCRA 2026-07');
+--   psql -h 10.0.16.3 -U postgres -d data -v yo="$USER" <<'SQL'
+--   insert into public.inflacion_proyectada (deflactor, fecha, var_mens, fuente, usuario)
+--   values ('ipc_largo',     '2026-07-01', 0.019, 'REM BCRA 2026-07', :'yo'),
+--          ('uscpi_mensual', '2026-07-01', 0.002, 'proyeccion propia', :'yo');
+--   SQL
 --
--- Corregir: insertar de nuevo el mismo (deflactor, fecha) con el valor nuevo.
--- La vista _actual se queda con el ingested_at mas reciente y la fila vieja
--- queda como historia.
+-- Ojo con las comillas: es :'yo' (con comilla simple), que es como psql interpola
+-- una variable como literal de texto. Sin las comillas la toma como identificador
+-- y falla.
+--
+-- Para extender la serie real un mes hacen falta las DOS proyecciones, pesos y
+-- dolares: el JOIN de prestamos_pm_real es inner y con una sola el mes no entra.
+--
+-- Varios meses de una: tienen que ser CONTIGUOS desde el ultimo mes publicado, o
+-- la corrida se corta en el hueco (ver el check 5).
+--
+-- Corregir: insertar de nuevo el mismo (deflactor, fecha) con el valor nuevo. La
+-- vista _actual se queda con la fila mas reciente y la vieja queda como historia,
+-- con su propio `usuario`: asi se ve quien cargo el valor original y quien lo
+-- corrigio.
