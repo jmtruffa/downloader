@@ -41,6 +41,12 @@ WITH publicado AS (
     FROM public."USCPI"
     WHERE series_id = 'CUUR0000SA0'
       AND period ~ '^M(0[1-9]|1[0-2])$'
+      -- BLS publica la fila con value = '-' y footnote 'X' cuando el dato no
+      -- existe, y el ETL la graba con NULL. Excluirla acá la convierte en un mes
+      -- AUSENTE, que es lo que el relleno de abajo sabe manejar. Si se dejara
+      -- pasar como fila con índice NULL, además de no arreglar nada podría
+      -- terminar siendo el vecino de otra interpolación y anularla.
+      AND value IS NOT NULL
 ),
 calendario AS (
     -- ::timestamp (SIN zona) a propósito. Con `date` los límites se castean a
