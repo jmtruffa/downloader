@@ -8,6 +8,8 @@ import sqlalchemy
 from datetime import datetime
 from sqlalchemy import create_engine, text
 
+import seasonalDesest
+
 db_user = os.environ.get('POSTGRES_USER')
 db_password = os.environ.get('POSTGRES_PASSWORD')
 db_host = os.environ.get('POSTGRES_HOST')
@@ -57,39 +59,66 @@ def replaceTable(df, tableName):
             dtype=dtypeMap,
         )
 
-def refreshAgregadosPrivados():
-    """Refresca el matview public."agregadosPrivados" (agregados monetarios del
-    sector privado, serie diaria, con sus variaciones anuales).
+# Matviews derivadas que hay que refrescar al final de cada corrida. Sus
+# definiciones viven en el repo, un archivo .sql por objeto.
+#   agregadosPrivados   -> agregadosPrivados.sql   (serie diaria, tipoSerie = D)
+#   agregadosPrivadosPM -> agregadosPrivadosPM.sql (promedio mensual, PM)
+# Ambas derivan de depositos y bmBCRA, así que se refrescan cuando las dos
+# tablas ya están cargadas. Reemplazan al procedure agregadosprivados() (que
+# dropeaba y recreaba la tabla, llevándose los índices y dejando a los lectores
+# sin tabla mientras corría) y a la función varAgregados() en pandas, que traía
+# la serie entera para dividir columnas y perdía el 30% de las fechas.
+MATVIEWS = ('agregadosPrivados', 'agregadosPrivadosPM', 'prestamos_pm_real')
 
-    Va al final del ETL, cuando depositos y bmBCRA ya están cargados y
-    commiteados, y en conexión propia en AUTOCOMMIT porque REFRESH MATERIALIZED
-    VIEW CONCURRENTLY no puede ejecutarse dentro de una transacción.
+# Series a desestacionalizar con Census X-13, y sus parámetros. Mismo vocabulario
+# que el cuadro series_desest.toml del monorepo de ETLs, para que la calibración
+# hecha allá se pueda trasladar acá. Definiciones en prestamosDesest.sql.
+#
+#   mode        mult = multiplicativo (transform=log; exige serie > 0)
+#   td          none = sin ajuste por días hábiles
+#   seasonalma  s3x5 = filtro estacional estándar del X-11
+#
+# ATENCIÓN: estos valores son un default RAZONADO, no calibrado contra una
+# referencia externa como los del monorepo. mult porque son series financieras
+# positivas con estacionalidad proporcional al nivel; td=none porque préstamos es
+# un stock (promedio mensual de saldos diarios), no un flujo que dependa de la
+# cantidad de días hábiles del mes. Si alguna serie no convence, el camino es
+# calibrarla como se hizo allá y ajustar acá.
+DESEST_JOBS = (
+    {'serie': 'pesosReal',   'sourceView': 'public.prestamos_pm_series',
+     'table': 'public.prestamos_desest', 'mode': 'mult', 'td': 'none',
+     'seasonalma': 's3x5'},
+    {'serie': 'dolaresReal', 'sourceView': 'public.prestamos_pm_series',
+     'table': 'public.prestamos_desest', 'mode': 'mult', 'td': 'none',
+     'seasonalma': 's3x5'},
+)
 
-    Reemplaza al procedure agregadosprivados() (que dropeaba y recreaba la
-    tabla, llevándose los índices y dejando a los lectores sin tabla mientras
-    corría) y a la función varAgregados() en pandas, que traía la serie entera
-    para dividir columnas y perdía el 30% de las fechas. La definición vive en
-    agregadosPrivados.sql. Si el matview no existe se avisa y se sigue;
-    cualquier otro error se propaga para que el MAILTO del cron avise.
+def refreshMatview(matviewName):
+    """Refresca un matview con REFRESH MATERIALIZED VIEW CONCURRENTLY.
+
+    En conexión propia en AUTOCOMMIT porque CONCURRENTLY no puede ejecutarse
+    dentro de una transacción. Si el matview no existe se avisa y se sigue: el
+    ETL de las tablas base no depende de él. Cualquier otro error se propaga
+    para que la corrida termine con exit code != 0 y el MAILTO del cron avise.
     """
     conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
     try:
         exists = conn.execute(text(
             "SELECT 1 FROM pg_class c "
             "JOIN pg_namespace n ON n.oid = c.relnamespace "
-            "WHERE n.nspname = 'public' AND c.relname = 'agregadosPrivados' "
+            "WHERE n.nspname = 'public' AND c.relname = :nombre "
             "AND c.relkind = 'm'"
-        )).scalar()
+        ), {'nombre': matviewName}).scalar()
 
         if not exists:
-            print('El matview public."agregadosPrivados" no existe: se omite el refresh.')
+            print(f'El matview public."{matviewName}" no existe: se omite el refresh.')
             return
 
-        print('Refrescando public."agregadosPrivados"...')
+        print(f'Refrescando public."{matviewName}"...')
         conn.execute(text(
-            'REFRESH MATERIALIZED VIEW CONCURRENTLY public."agregadosPrivados"'
+            f'REFRESH MATERIALIZED VIEW CONCURRENTLY public."{matviewName}"'
         ))
-        print('public."agregadosPrivados" refrescado OK.')
+        print(f'public."{matviewName}" refrescado OK.')
     finally:
         conn.close()
 
@@ -437,9 +466,14 @@ if __name__ == "__main__":
         else:
             print(f"An error occurred while downloading {func.__name__}")
 
-    # Recién acá: el matview depende de depositos y de bmBCRA, así que se
-    # refresca cuando las dos están cargadas, sin depender del orden de la lista.
-    refreshAgregadosPrivados()
+    # Recién acá: las matviews dependen de depositos y de bmBCRA, así que se
+    # refrescan cuando las dos están cargadas, sin depender del orden de la lista.
+    for matview in MATVIEWS:
+        refreshMatview(matview)
+
+    # Y la desestacionalización va última: lee prestamos_pm_real, que se acaba de
+    # refrescar. X-13 nunca tumba el ETL; si falla, lo reporta y sigue.
+    seasonalDesest.runDesest(engine, "prestamos", DESEST_JOBS)
 
     os.remove(file_path)
     #db.disconnect()
