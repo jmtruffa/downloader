@@ -1,0 +1,23 @@
+#!/bin/bash
+# Wrapper de IPCDownload: ejecuta el fuente Python con un venv ad-hoc dedicado.
+# Reemplaza al binario PyInstaller original (respaldado como IPCDownload.bin.bak).
+# Hereda las env vars POSTGRES_* del entorno que lo invoca (cron o shell), igual
+# que hacia el binario original.
+#
+# ESTE ARCHIVO ES LA FUENTE DE VERDAD. /home/jmt/data/apps/IPCDownload es un
+# symlink a este path, para que el crontab pueda seguir llamando a la ruta de
+# siempre y el contenido viva versionado. Editar aca, nunca alla.
+set -euo pipefail
+
+# Raiz del repo, resuelta desde la ubicacion real de este script. readlink -f
+# es necesario porque se invoca a traves del symlink de /home/jmt/data/apps.
+SRC_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+VENV_PY="/home/jmt/data/apps/.venv-IPCDownload/bin/python"
+LOG="/home/jmt/data/cron.log"
+
+# stdout va al log, stderr queda LIBRE para que el MAILTO del cron avise. Misma convencion
+# que run_etl.sh y run_balance_cambiario.sh. Por eso la linea del crontab NO debe llevar
+# `>> log 2>&1`: eso se traga el aviso, y fue exactamente lo que hizo que las cuatro corridas
+# fallidas del 10 al 13/08/2026 pasaran cuatro dias sin que nadie se enterara.
+cd "$SRC_DIR"
+exec "$VENV_PY" IPCDownload.py "$@" >> "$LOG"
