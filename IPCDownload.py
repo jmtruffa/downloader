@@ -1,10 +1,37 @@
 import tempfile
 import os
+import sys
+import time
 import requests
 from datetime import datetime
 import pandas as pd
 from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
+
+
+# Firmas de archivo aceptadas. OLE2 es el .xls clasico que publica INDEC; ZIP cubre un
+# eventual cambio a .xlsx, que pandas tambien lee.
+FIRMAS_EXCEL = (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", b"PK\x03\x04")
+
+# Reintentos de la descarga. Apenas INDEC publica (16:00) el host se satura y corta la
+# transferencia a mitad de archivo: el 13/08/2026 trajo 2.170.549 de 2.372.608 bytes.
+# Un reintento con espera resuelve ese corte sin esperar a la corrida del dia siguiente.
+REINTENTOS = 3
+ESPERA_REINTENTO_SEG = 20
+
+
+def err(mensaje):
+    """Escribe en stderr.
+
+    El wrapper manda stdout al log y deja stderr libre a proposito, para que el MAILTO del
+    cron avise. Todo lo que sea un fallo real va por aca; el relato normal va por print().
+    """
+    print(mensaje, file=sys.stderr)
+
+
+def esExcel(contenido):
+    """True si el contenido arranca con la firma de un Excel (OLE2 o ZIP/xlsx)."""
+    return contenido[:8].startswith(FIRMAS_EXCEL)
 
 
 def downloadIPC(aCurrentTime):
@@ -33,21 +60,66 @@ def downloadIPC(aCurrentTime):
     # File path for the downloaded XLS file
     file_path = os.path.join(temp_dir, "ipc.xls")
 
-    # Download the XLS file from the URL 
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Check if the request was successful
-        with open(file_path, "wb") as file:
-            file.write(response.content)
-    except requests.exceptions.RequestException as e:
-        print(f"No se pudo descargar el archivo: {e}")
-        return False
-    
-    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print("------------------------------------")
-    print(f"IPC descargado OK a las {aCurrentTime}")
+    # Devuelve (estado, file_path) con estado en {"ok", "no_publicado", "error"}.
+    #
+    # La distincion importa: "todavia no publicaron" es el caso NORMAL los primeros dias de la
+    # ventana y tiene que terminar en salida limpia, mientras que un fallo real tiene que
+    # avisar. Antes no se distinguian: se guardaba cualquier respuesta como .xls y el problema
+    # aparecia recien en pd.read_excel, como un ValueError que no dice nada
+    # ("Excel file format cannot be determined"). Paso el 10 y el 12/08/2026.
+    for intento in range(1, REINTENTOS + 1):
+        try:
+            response = requests.get(url, timeout=120)
+        except requests.exceptions.RequestException as e:
+            err(f"Intento {intento}/{REINTENTOS}: fallo la descarga: {e}")
+            if intento < REINTENTOS:
+                time.sleep(ESPERA_REINTENTO_SEG)
+                continue
+            return "error", None
 
-    return file_path
+        if response.status_code == 404:
+            # El cuadro del mes todavia no esta subido. No es un fallo.
+            print(f"INDEC todavia no publico {url} (HTTP 404).")
+            return "no_publicado", None
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            err(f"Intento {intento}/{REINTENTOS}: {e}")
+            if intento < REINTENTOS:
+                time.sleep(ESPERA_REINTENTO_SEG)
+                continue
+            return "error", None
+
+        contenido = response.content
+
+        # Content-Length parcial = la transferencia se corto a mitad de archivo. Se reintenta:
+        # el archivo esta bien del lado de INDEC, lo que fallo es el transporte.
+        largoDeclarado = response.headers.get("Content-Length")
+        if largoDeclarado is not None and len(contenido) != int(largoDeclarado):
+            err(f"Intento {intento}/{REINTENTOS}: descarga incompleta "
+                f"({len(contenido)} de {largoDeclarado} bytes).")
+            if intento < REINTENTOS:
+                time.sleep(ESPERA_REINTENTO_SEG)
+                continue
+            return "error", None
+
+        # INDEC responde 200 con una pagina HTML cuando el cuadro todavia no esta, asi que el
+        # status por si solo no alcanza: hay que mirar el contenido.
+        if not esExcel(contenido):
+            tipo = response.headers.get("Content-Type", "desconocido")
+            print(f"La respuesta de {url} no es un Excel "
+                  f"(Content-Type: {tipo}, {len(contenido)} bytes): se toma como no publicado.")
+            return "no_publicado", None
+
+        with open(file_path, "wb") as file:
+            file.write(contenido)
+
+        print("------------------------------------")
+        print(f"IPC descargado OK a las {aCurrentTime} ({len(contenido)} bytes)")
+        return "ok", file_path
+
+    return "error", None
 
 def parseIPC(file_path, aCurrentTime):
     print(f"Parseando el archivo IPC. Iniciado a las {aCurrentTime} ")
@@ -188,30 +260,37 @@ def saveIPC(df, aCurrentTime):
 def main():
     currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # bajamos el ipc. Me devuelve el path del archivo
-    file_path = downloadIPC(currentTime)
+    # bajamos el ipc. Me devuelve (estado, path del archivo)
+    estado, file_path = downloadIPC(currentTime)
 
-    # si la descarga falló, downloadIPC devuelve False: salimos limpio
-    # sin intentar parsear ni borrar un path inexistente
-    if not file_path:
-        print("No se pudo descargar el IPC. Se aborta la ejecución.")
-        return False
+    # "todavia no publicaron" es el caso NORMAL los primeros dias de la ventana: sale con 0 y
+    # no dispara el MAILTO del cron. Un fallo real sale con 1, y ahi si avisa.
+    if estado == "no_publicado":
+        print("El IPC del mes todavia no esta publicado. Nada que hacer.")
+        return 0
+    if estado != "ok":
+        err("No se pudo descargar el IPC. Se aborta la ejecucion.")
+        return 1
 
     # parseamos el ipc
     currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    df = parseIPC(file_path, currentTime)
-
-    # borramos el archivo temporal una vez parseado
-    os.remove(file_path)
+    try:
+        df = parseIPC(file_path, currentTime)
+    finally:
+        # el temporal se borra aunque el parseo falle
+        os.remove(file_path)
 
     # grabamos el ipc en la base de datos
     if df is not None:
         currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         saveIPC(df, currentTime)
 
-    return True
+    return 0
 
 if __name__ == "__main__":
-    main()
+    # El exit code es el contrato con el cron: 0 = todo bien o todavia no publicaron,
+    # != 0 = algo se rompio y el MAILTO tiene que avisar. Un parseIPC que explote propaga
+    # el traceback por stderr y sale != 0 solo, que es exactamente lo que queremos.
+    sys.exit(main())
     
 
