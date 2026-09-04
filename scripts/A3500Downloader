@@ -1,0 +1,21 @@
+#!/bin/bash
+# Wrapper de cron para A3500DownloaderPostgres.py: ejecuta el fuente Python con el venv del
+# repo, igual que hace scripts/IPCDownload. Reemplaza a la invocacion directa que tenia el
+# crontab (`cd ... && .venv/bin/python A3500DownloaderPostgres.py >> cron.log`), que se comia
+# los errores: el script imprimia la falla por stdout y salia con codigo 0, asi que una caida
+# del BCRA dejaba la serie sin actualizar y nadie se enteraba.
+#
+# Hereda las env vars POSTGRES_* del entorno que lo invoca (cron o shell).
+set -euo pipefail
+
+# Raiz del repo, resuelta desde la ubicacion real de este script. readlink -f es necesario
+# por si alguna vez se lo llama a traves de un symlink, como pasa con IPCDownload.
+SRC_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+VENV_PY="$SRC_DIR/.venv/bin/python"
+LOG="/home/jmt/data/cron.log"
+
+# stdout va al log, stderr queda LIBRE para que el MAILTO del cron avise. Misma convencion
+# que scripts/IPCDownload, run_etl.sh y run_balance_cambiario.sh. Por eso la linea del crontab
+# NO debe llevar `>> log 2>&1`: eso se traga el aviso.
+cd "$SRC_DIR"
+exec "$VENV_PY" A3500DownloaderPostgres.py "$@" >> "$LOG"
