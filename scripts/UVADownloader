@@ -1,0 +1,17 @@
+#!/bin/bash
+# Wrapper de cron para UVADownloader.py: ejecuta el fuente Python con el venv del repo,
+# misma convencion que scripts/A3500Downloader y scripts/IPCDownload.
+#
+# Hereda las env vars POSTGRES_* del entorno que lo invoca (cron o shell).
+set -euo pipefail
+
+# Raiz del repo, resuelta desde la ubicacion real de este script. readlink -f es necesario
+# por si alguna vez se lo llama a traves de un symlink, como pasa con IPCDownload.
+SRC_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+VENV_PY="$SRC_DIR/.venv/bin/python"
+LOG="/home/jmt/data/cron.log"
+
+# stdout va al log, stderr queda LIBRE para que el MAILTO del cron avise. Por eso la linea
+# del crontab NO debe llevar `>> log 2>&1`: eso se traga el aviso.
+cd "$SRC_DIR"
+exec "$VENV_PY" UVADownloader.py "$@" >> "$LOG"
