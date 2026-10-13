@@ -1,4 +1,4 @@
-import tempfile
+import io
 import os
 import sys
 import time
@@ -9,15 +9,40 @@ from dataBaseConn2 import DatabaseConnection
 import sqlalchemy
 
 
-# Firmas de archivo aceptadas. OLE2 es el .xls clasico que publica INDEC; ZIP cubre un
-# eventual cambio a .xlsx, que pandas tambien lee.
-FIRMAS_EXCEL = (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", b"PK\x03\x04")
+# Fuente: serie larga del IPC por divisiones, en formato largo (una fila por serie, region y
+# mes). Reemplaza al sh_ipc_MM_YY.xls desde el 2026-10-13: ese dia INDEC publico el IPC pero
+# el .xls del mes no aparecio en el FTP, y este CSV ya tenia el dato nuevo. Ademas el parseo
+# deja de depender de la hoja, las filas a saltear y ~60 indices de columnas del Excel.
+# Validado contra sh_ipc_09_26.xls: mismas 126 series, diferencia maxima 0.0005 (redondeo).
+URL_IPC = "https://www.indec.gob.ar/ftp/cuadros/economia/serie_ipc_divisiones.csv"
+ENCABEZADO_CSV = "Codigo;Descripcion;Clasificador;Periodo;Indice_IPC"
 
 # Reintentos de la descarga. Apenas INDEC publica (16:00) el host se satura y corta la
 # transferencia a mitad de archivo: el 13/08/2026 trajo 2.170.549 de 2.372.608 bytes.
 # Un reintento con espera resuelve ese corte sin esperar a la corrida del dia siguiente.
+# El corte llega como excepcion (urllib3 2.x valida el Content-Length por su cuenta), asi
+# que no hace falta compararlo a mano. Hacerlo era ademas un bug: con gzip el header trae
+# el largo comprimido y response.content el descomprimido.
 REINTENTOS = 3
 ESPERA_REINTENTO_SEG = 20
+
+# Region del CSV -> prefijo de columna en la tabla IPCIndec.
+REGIONES = {
+    "Nacional": "nacional", "GBA": "gba", "Pampeana": "pampeana", "Noroeste": "noa",
+    "Noreste": "nea", "Cuyo": "cuyo", "Patagonia": "patagonia",
+}
+
+# Codigo de serie del CSV -> sufijo de columna en la tabla IPCIndec.
+SERIES = {
+    "0": "NivelGeneral", "01": "AlimBebidasNoAlcohol", "02": "BebidasAlcoholTabaco",
+    "03": "PrendasVestirCalzado", "04": "ViviendaAgua", "05": "Equipamiento", "06": "Salud",
+    "07": "Transporte", "08": "Comunicacion", "09": "Recreacion", "10": "Educacion",
+    "11": "Restaurant", "12": "BsSvsVarios", "Estacional": "Estacional", "Núcleo": "Nucleo",
+    "Regulados": "Regulados", "B": "Bienes", "S": "Servicios",
+}
+
+# Orden de columnas de la tabla: date + region x serie, igual que con el .xls.
+COLUMNAS = [region + serie for region in REGIONES.values() for serie in SERIES.values()]
 
 
 def err(mensaje):
@@ -29,142 +54,66 @@ def err(mensaje):
     print(mensaje, file=sys.stderr)
 
 
-def esExcel(contenido):
-    """True si el contenido arranca con la firma de un Excel (OLE2 o ZIP/xlsx)."""
-    return contenido[:8].startswith(FIRMAS_EXCEL)
-
-
 def downloadIPC(aCurrentTime):
-    # guardo el mes en la variable mes. 
-    mes = datetime.now().month
+    """Baja el CSV del IPC. Devuelve el contenido en bytes, o None si no se pudo."""
+    print(URL_IPC)
 
-    # guardo el año en la variable anio
-    anio = datetime.now().year
-
-    # tomo los últimos dos caracteres del año
-    anio = str(anio)[2:]
-
-    # construyo url "https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_11_23.xls" con el mes actual
-    # str(mes) with leading zero if necessary
-    if mes < 10:
-        mes = "0" + str(mes)
-    else:
-        mes = str(mes)
-    url = "https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_" + mes + "_" + anio + ".xls"
-    print(url)
-    # https://www.indec.gob.ar/ftp/cuadros/economia/sh_ipc_01_24.xls
-   
-    # Create a temporary directory to store the downloaded file
-    temp_dir = tempfile.mkdtemp()
-
-    # File path for the downloaded XLS file
-    file_path = os.path.join(temp_dir, "ipc.xls")
-
-    # Devuelve (estado, file_path) con estado en {"ok", "no_publicado", "error"}.
-    #
-    # La distincion importa: "todavia no publicaron" es el caso NORMAL los primeros dias de la
-    # ventana y tiene que terminar en salida limpia, mientras que un fallo real tiene que
-    # avisar. Antes no se distinguian: se guardaba cualquier respuesta como .xls y el problema
-    # aparecia recien en pd.read_excel, como un ValueError que no dice nada
-    # ("Excel file format cannot be determined"). Paso el 10 y el 12/08/2026.
     for intento in range(1, REINTENTOS + 1):
         try:
-            response = requests.get(url, timeout=120)
+            response = requests.get(URL_IPC, timeout=120)
+            response.raise_for_status()
         except requests.exceptions.RequestException as e:
             err(f"Intento {intento}/{REINTENTOS}: fallo la descarga: {e}")
             if intento < REINTENTOS:
                 time.sleep(ESPERA_REINTENTO_SEG)
-                continue
-            return "error", None
-
-        if response.status_code == 404:
-            # El cuadro del mes todavia no esta subido. No es un fallo.
-            print(f"INDEC todavia no publico {url} (HTTP 404).")
-            return "no_publicado", None
-
-        try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            err(f"Intento {intento}/{REINTENTOS}: {e}")
-            if intento < REINTENTOS:
-                time.sleep(ESPERA_REINTENTO_SEG)
-                continue
-            return "error", None
+            continue
 
         contenido = response.content
 
-        # Content-Length parcial = la transferencia se corto a mitad de archivo. Se reintenta:
-        # el archivo esta bien del lado de INDEC, lo que fallo es el transporte.
-        largoDeclarado = response.headers.get("Content-Length")
-        if largoDeclarado is not None and len(contenido) != int(largoDeclarado):
-            err(f"Intento {intento}/{REINTENTOS}: descarga incompleta "
-                f"({len(contenido)} de {largoDeclarado} bytes).")
+        # INDEC responde 200 con una pagina HTML cuando un archivo no esta, asi que el status
+        # por si solo no alcanza: hay que mirar el contenido.
+        if not contenido.decode("latin1", errors="replace").startswith(ENCABEZADO_CSV):
+            tipo = response.headers.get("Content-Type", "desconocido")
+            err(f"Intento {intento}/{REINTENTOS}: la respuesta no es el CSV esperado "
+                f"(Content-Type: {tipo}, {len(contenido)} bytes).")
             if intento < REINTENTOS:
                 time.sleep(ESPERA_REINTENTO_SEG)
-                continue
-            return "error", None
-
-        # INDEC responde 200 con una pagina HTML cuando el cuadro todavia no esta, asi que el
-        # status por si solo no alcanza: hay que mirar el contenido.
-        if not esExcel(contenido):
-            tipo = response.headers.get("Content-Type", "desconocido")
-            print(f"La respuesta de {url} no es un Excel "
-                  f"(Content-Type: {tipo}, {len(contenido)} bytes): se toma como no publicado.")
-            return "no_publicado", None
-
-        with open(file_path, "wb") as file:
-            file.write(contenido)
+            continue
 
         print("------------------------------------")
         print(f"IPC descargado OK a las {aCurrentTime} ({len(contenido)} bytes)")
-        return "ok", file_path
+        return contenido
 
-    return "error", None
+    return None
 
-def parseIPC(file_path, aCurrentTime):
+def parseIPC(contenido, aCurrentTime):
     print(f"Parseando el archivo IPC. Iniciado a las {aCurrentTime} ")
 
-    # Read the XLSM file
-    data_df = pd.read_excel(file_path, header=None, skiprows=5, sheet_name=2)
+    data_df = pd.read_csv(io.BytesIO(contenido), sep=";", encoding="latin1", dtype=str,
+                          na_values=["NA"], keep_default_na=False)
 
-    # transpose the DataFrame
-    data_df = data_df.T
+    # Solo las series que van a la tabla; el CSV podria sumar otras sin romper nada.
+    data_df = data_df[data_df["Region"].isin(REGIONES) & data_df["Codigo"].isin(SERIES)].copy()
+    data_df["columna"] = data_df["Region"].map(REGIONES) + data_df["Codigo"].map(SERIES)
+    data_df["date"] = pd.to_datetime(data_df["Periodo"], format="%Y%m").dt.date
+    data_df["valor"] = pd.to_numeric(data_df["Indice_IPC"].str.replace(",", ".", regex=False),
+                                     errors="raise")
 
-    # Drop columns
-    columns_to_drop = [1, 2, 3, 17, 18, 22, 23] + list(range(26, 34,1)) + [47, 48, 52, 53] + list(range(56, 64, 1)) + [77, 78, 82, 83] + list(range(86,94,1)) + [107, 108, 112, 113] + list(range(116,124,1)) + [137, 138, 142, 143] + list(range(146,154,1)) + [167, 168, 172, 173] + list(range(176,184,1)) + [197, 198, 202, 203] + list(range(206,len(data_df.columns),1))
-    data_df = data_df.drop(columns=data_df.columns[columns_to_drop])
-    
-    # Drop rows
-    data_df = data_df.drop([0])
-    
+    if data_df.duplicated(["date", "columna"]).any():
+        raise ValueError("El CSV del IPC trae series duplicadas para un mismo mes y region.")
 
+    data_df = data_df.pivot(index="date", columns="columna", values="valor")
 
-    columnNames = ["date", 
-                       "nacionalNivelGeneral", "nacionalAlimBebidasNoAlcohol", "nacionalBebidasAlcoholTabaco", "nacionalPrendasVestirCalzado", "nacionalViviendaAgua", "nacionalEquipamiento", "nacionalSalud", "nacionalTransporte", "nacionalComunicacion", "nacionalRecreacion", "nacionalEducacion", "nacionalRestaurant", "nacionalBsSvsVarios", "nacionalEstacional", "nacionalNucleo", "nacionalRegulados", "nacionalBienes", "nacionalServicios",
-                       "gbaNivelGeneral", "gbaAlimBebidasNoAlcohol", "gbaBebidasAlcoholTabaco", "gbaPrendasVestirCalzado", "gbaViviendaAgua", "gbaEquipamiento", "gbaSalud", "gbaTransporte", "gbaComunicacion", "gbaRecreacion", "gbaEducacion", "gbaRestaurant", "gbaBsSvsVarios", "gbaEstacional", "gbaNucleo", "gbaRegulados", "gbaBienes", "gbaServicios",
-                       "pampeanaNivelGeneral", "pampeanaAlimBebidasNoAlcohol", "pampeanaBebidasAlcoholTabaco", "pampeanaPrendasVestirCalzado", "pampeanaViviendaAgua", "pampeanaEquipamiento", "pampeanaSalud", "pampeanaTransporte", "pampeanaComunicacion", "pampeanaRecreacion", "pampeanaEducacion", "pampeanaRestaurant", "pampeanaBsSvsVarios", "pampeanaEstacional", "pampeanaNucleo", "pampeanaRegulados", "pampeanaBienes", "pampeanaServicios",
-                       "noaNivelGeneral", "noaAlimBebidasNoAlcohol", "noaBebidasAlcoholTabaco", "noaPrendasVestirCalzado", "noaViviendaAgua", "noaEquipamiento", "noaSalud", "noaTransporte", "noaComunicacion", "noaRecreacion", "noaEducacion", "noaRestaurant", "noaBsSvsVarios", "noaEstacional", "noaNucleo", "noaRegulados", "noaBienes", "noaServicios",
-                          "neaNivelGeneral", "neaAlimBebidasNoAlcohol", "neaBebidasAlcoholTabaco", "neaPrendasVestirCalzado", "neaViviendaAgua", "neaEquipamiento", "neaSalud", "neaTransporte", "neaComunicacion", "neaRecreacion", "neaEducacion", "neaRestaurant", "neaBsSvsVarios", "neaEstacional", "neaNucleo", "neaRegulados", "neaBienes", "neaServicios",
-                            "cuyoNivelGeneral", "cuyoAlimBebidasNoAlcohol", "cuyoBebidasAlcoholTabaco", "cuyoPrendasVestirCalzado", "cuyoViviendaAgua", "cuyoEquipamiento", "cuyoSalud", "cuyoTransporte", "cuyoComunicacion", "cuyoRecreacion", "cuyoEducacion", "cuyoRestaurant", "cuyoBsSvsVarios", "cuyoEstacional", "cuyoNucleo", "cuyoRegulados", "cuyoBienes", "cuyoServicios",
-                            "patagoniaNivelGeneral", "patagoniaAlimBebidasNoAlcohol", "patagoniaBebidasAlcoholTabaco", "patagoniaPrendasVestirCalzado", "patagoniaViviendaAgua", "patagoniaEquipamiento", "patagoniaSalud", "patagoniaTransporte", "patagoniaComunicacion", "patagoniaRecreacion", "patagoniaEducacion", "patagoniaRestaurant", "patagoniaBsSvsVarios", "patagoniaEstacional", "patagoniaNucleo", "patagoniaRegulados", "patagoniaBienes", "patagoniaServicios"
-    ]
+    # Si INDEC renombra una region o un codigo, la serie desaparece en silencio. Mejor fallar
+    # (y que avise el MAILTO) que pisar la tabla con columnas vacias.
+    faltantes = [c for c in COLUMNAS if c not in data_df.columns]
+    if faltantes:
+        raise ValueError(f"Faltan series en el CSV del IPC: {faltantes}")
+    data_df = data_df[COLUMNAS]
+    if data_df.isna().any().any():
+        raise ValueError("El CSV del IPC trae huecos (NA) en el indice.")
 
-    # Set column names
-    data_df.columns = columnNames
-
-
-    # date column without time
-    # INDEC a veces publica la fecha con un día distinto al primero del mes
-    # (ej: 2026-03-26 en lugar de 2026-03-01) y no lo corrigen de su lado.
-    # El IPC es una serie mensual, así que normalizamos toda fecha al primer
-    # día de su mes: arregla ese typo y cualquiera futuro de la misma clase.
-    data_df["date"] = (
-        pd.to_datetime(data_df["date"]).dt.to_period("M").dt.to_timestamp().dt.date
-    )
-
-    # convert all columns except date to numeric
-    for column in data_df.columns[1:]:
-        data_df[column] = pd.to_numeric(data_df[column], errors='coerce')
+    data_df = data_df.sort_index().reset_index()
 
     data_dfVar = data_df.copy()
     data_dfVar.columns = ["date"] + ["var" + column[0].upper() + column[1:] for column in data_df.columns[1:]]
@@ -173,12 +122,21 @@ def parseIPC(file_path, aCurrentTime):
     for column in data_dfVar.columns[1:]:
         data_dfVar[column] = data_dfVar[column].pct_change()
 
-    # drop the first column of data_dfVar and bind rows with data_df
-    #data_df = pd.concat([data_df.iloc[:, 0], data_dfVar.iloc[:, 1:]], axis=1)
-    
     data_df = pd.concat([data_df.iloc[:,:], data_dfVar.iloc[:, 1:]], axis=1)
 
     return data_df
+
+def ultimoMesEnBase():
+    """Ultimo mes cargado en IPCIndec, o None si la tabla no existe o esta vacia."""
+    db = DatabaseConnection(db_type="postgresql", db_name=os.environ.get('POSTGRES_DB'))
+    db.connect()
+    try:
+        if not sqlalchemy.inspect(db.engine).has_table('IPCIndec', schema='public'):
+            return None
+        with db.engine.connect() as conn:
+            return conn.execute(sqlalchemy.text('SELECT max(date) FROM public."IPCIndec"')).scalar()
+    finally:
+        db.disconnect()
 
 def refreshIPCLargo(db):
     """Refresca el matview public.ipc_largo (IPC empalmado base dic-2016 = 100).
@@ -260,30 +218,26 @@ def saveIPC(df, aCurrentTime):
 def main():
     currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # bajamos el ipc. Me devuelve (estado, path del archivo)
-    estado, file_path = downloadIPC(currentTime)
-
-    # "todavia no publicaron" es el caso NORMAL los primeros dias de la ventana: sale con 0 y
-    # no dispara el MAILTO del cron. Un fallo real sale con 1, y ahi si avisa.
-    if estado == "no_publicado":
-        print("El IPC del mes todavia no esta publicado. Nada que hacer.")
-        return 0
-    if estado != "ok":
+    contenido = downloadIPC(currentTime)
+    if contenido is None:
         err("No se pudo descargar el IPC. Se aborta la ejecucion.")
         return 1
 
-    # parseamos el ipc
     currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        df = parseIPC(file_path, currentTime)
-    finally:
-        # el temporal se borra aunque el parseo falle
-        os.remove(file_path)
+    df = parseIPC(contenido, currentTime)
 
-    # grabamos el ipc en la base de datos
-    if df is not None:
-        currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        saveIPC(df, currentTime)
+    # El CSV tiene nombre fijo y siempre existe, asi que "todavia no publicaron" se detecta
+    # comparando meses: si no trae nada mas nuevo que la base, no hay nada que hacer. Es el
+    # caso NORMAL los primeros dias de la ventana y sale con 0, sin disparar el MAILTO.
+    ultimoCsv = df["date"].max()
+    ultimoBase = ultimoMesEnBase()
+    if ultimoBase is not None and ultimoCsv <= ultimoBase:
+        print(f"El IPC del mes todavia no esta publicado (ultimo mes: {ultimoCsv}). Nada que hacer.")
+        return 0
+
+    print(f"Hay IPC nuevo: {ultimoCsv} (en base: {ultimoBase})")
+    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    saveIPC(df, currentTime)
 
     return 0
 
