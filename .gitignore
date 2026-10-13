@@ -9,6 +9,10 @@ tempEnvVars.sh
 .venv
 .DS_Store
 launch.json
+compile.sh
+*.spec
+*_env/
+*_venv/
+build/
 # Registro de skills de la herramienta de IA: metadata regenerable, no del ETL.
 .atl/
-
